@@ -1,0 +1,836 @@
+---
+title: "Problem Set 2"
+author: "Josh Goetz"
+date: "2023-10-24"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Things to do before submitting
+#Make sure it knits!
+#Make the plots prettier
+#Make the answers clearer (maybe separate them from the code chunks)
+
+
+
+#Remove stuff
+rm(list=ls())
+
+#Load libraries
+library(dplyr)
+
+#Load dataset
+load("lifestyledat.Rda")
+
+#Get a sense of the data
+#str(lifedat2)
+table(lifedat2$gendersp, useNA = "ifany")
+table(lifedat2$RACE_COMBINED, useNA = "ifany")
+
+#Remove observations where "gendersp" = "Refused" or "RACE_COMBINED" = "NA"
+#! means "not", so we select only columns where neither case satisfied
+life_clean = subset(lifedat2, !(gendersp == "Refused" | RACE_COMBINED == "NA"))
+
+#str(life_clean)
+#Check
+table(life_clean$gendersp, useNA = "ifany")
+table(life_clean$RACE_COMBINED, useNA = "ifany")
+#Looking good
+
+#Code missing values (NA) in the news consumption items as “No”
+#Do this for all columns that start with "NEW"
+#Select all columns that start with "NEW"
+#Mutate the data in those columns as follows:
+#If the data is NA, replace with No
+#If data is anything else, leave it as is
+#The "." means the stuff in the columns
+#as.character is needed b/c the code was initially changing Yes to 1 and No to 2
+life_clean2 <- life_clean %>% 
+  mutate_at(vars(starts_with("NEW")), list(~ ifelse(is.na(.), "No", as.character(.))))
+
+#Check to see if it worked
+table(life_clean$NEWP2S40_6, useNA = "ifany")
+table(life_clean2$NEWP2S40_6, useNA = "ifany")
+#It did!
+
+#Recode non-response (“Don’t know” and “Refused” values) in the TV and Food con-
+#sumption batteries as “never”
+#Similar code as above, but with case_when and commas
+life_clean3 <- life_clean2 %>% 
+  mutate_at(vars(starts_with(c("FOOD", "FAST", "TV"))), list(~ case_when(
+    . %in% c("Don't Know", "Refused") ~ "never",
+    TRUE ~ as.character(.)
+  )))
+
+#Check
+table(life_clean2$FOOD1S53, useNA = "ifany")
+table(life_clean3$FOOD1S53, useNA = "ifany")
+
+table(life_clean2$FASTFD1S53, useNA = "ifany")
+table(life_clean3$FASTFD1S53, useNA = "ifany")
+
+table(life_clean2$TV1S53, useNA = "ifany")
+table(life_clean3$TV1S53, useNA = "ifany")
+#Looking good!
+
+
+#Recode non-response in the technology items as “No”
+life_clean4 <- life_clean3 %>% 
+  mutate_at(vars(starts_with("TECH")), list(~ case_when(
+    . %in% c("don't know or not sure", "Refused") ~ "no",
+    TRUE ~ as.character(.)
+  )))
+
+#Check
+table(life_clean3$TECH4S47, useNA = "ifany")
+table(life_clean4$TECH4S47, useNA = "ifany")
+#We're good!
+
+
+#Recode non-response in the activities battery as “0 (none)”
+table(life_clean4$ACT1S47, useNA = "ifany")
+
+life_clean5 <- life_clean4 %>% 
+  mutate_at(vars(starts_with("ACT")), list(~ ifelse(. == "Refused", "0 (none)", as.character(.))))
+
+#Check
+table(life_clean5$ACT1S47, useNA = "ifany")
+#We're good!
+
+
+#Recode non-response in the sports and music batteries as “Neither dislike nor dislike”
+
+
+life_clean6 <- life_clean5 %>% 
+  mutate_at(vars(starts_with(c("SPORTS", "MUSIC"))), list(~ case_when(
+    . %in% c("don\x92t know", "Refused") ~ "neither like nor dislike",
+    TRUE ~ as.character(.)
+  )))
+
+#Check
+table(life_clean5$SPORTS3S48, useNA = "ifany")
+table(life_clean6$SPORTS3S48, useNA = "ifany")
+
+table(life_clean5$MUSICGS48, useNA = "ifany")
+table(life_clean6$MUSICGS48, useNA = "ifany")
+#We're good!
+
+
+
+#Recode non-response in the fast food item as “0”
+#Accidentally did this earlier
+#Now convert "never" to 0
+table(life_clean6$FASTFD1S53, useNA = "ifany")
+
+life_clean7 <- life_clean6 %>% 
+  mutate_at(vars(starts_with("FAST")), list(~ ifelse(. == "never", 0, as.character(.))))
+
+#Check
+table(life_clean7$FASTFD1S53, useNA = "ifany")
+#We're good!
+
+
+
+
+#Create a new variable called IS IDEOL that takes the value of 0 if a respondent an-
+#swered “Refused” or “DK” to the ideological self-placement question, and a value of 1
+#otherwise
+
+life_clean8 = life_clean7 %>% mutate(IDEOL = case_when(LIBCON0S53 == -1 ~ 0,
+                                                       LIBCON0S53 == 6 ~ 0,
+                                                       TRUE ~ 1))
+checker = life_clean8 %>% select(LIBCON0S53, IDEOL)
+
+#Check
+table(checker$LIBCON0S53, useNA = "ifany")
+table(checker$IDEOL, useNA = "ifany")
+#As good as two shoes!
+
+
+
+#Recode the “Refused” or “DK” answers in ideological self-placement to missing values
+
+life_clean9 <- life_clean8 %>% 
+  mutate_at(vars(starts_with("LIBCON")), list(~ case_when(
+    . %in% c(-1, 6) ~ NA,
+    TRUE ~ as.character(.)
+  )))
+
+#Check
+table(life_clean8$LIBCON0S53, useNA = "ifany")
+table(life_clean9$LIBCON0S53, useNA = "ifany")
+#Yippee!
+
+
+
+
+
+#Recode missing values of the party ID variable into Independents
+
+#variable.names(life_clean9)
+#PID7_MAXN is the partisanship variable
+
+life_clean10 = life_clean9 %>% mutate(PID7_MAXN = case_when(
+    is.na(PID7_MAXN) ~ "Independent",
+    TRUE ~ PID7_MAXN
+))
+
+
+table(life_clean9$PID7_MAXN, useNA = "ifany")
+table(life_clean10$PID7_MAXN, useNA = "ifany")
+
+
+
+
+
+
+#Create a new party ID variable with 3 categories: Democrats, Independents and Re-
+#publicans (consider weak and leaners as partisans)
+
+
+#For this, we need the str_detect function from the stringr library
+#str detect will select any values that contain certain words (e.g. "Democrat")
+library(stringr)
+
+life_clean11 <- life_clean10 %>%
+  mutate(PID_new = case_when(
+    str_detect(PID7_MAXN, "Republican") ~ "Republican",
+    str_detect(PID7_MAXN, "Democrat") ~ "Democrat",
+    PID7_MAXN == "Independent" ~ "Independent"
+  ))
+
+#Check
+table(life_clean10$PID7_MAXN, useNA = "ifany")
+table(life_clean11$PID_new, useNA = "ifany")
+#Amazing!
+
+
+
+
+
+
+#Recode “Refused” answers to “no opinion” in the policy issues battery
+
+table(life_clean11$ISSUESA1S48, useNA = "ifany")
+
+life_clean12 <- life_clean11 %>% 
+  mutate_at(vars(starts_with("ISSUES")), list(~ ifelse(. == "Refused", "no opinion", as.character(.))))
+
+#Check
+table(life_clean12$ISSUESA1S48, useNA = "ifany")
+#We're good!
+
+
+#Turn everything into factors
+#Thanks, Clayton!
+life_clean13 = life_clean12 %>% mutate(across(where(is.character), as.factor))
+life_clean13 = life_clean12 %>% mutate(across(where(is.integer), as.factor))
+life_clean13 = life_clean12 %>% mutate(across(where(is.numeric), as.factor))
+
+
+
+#Final cleaned dataset = life_clean12
+#Final cleaned dataset as factors: life_clean13 (it rhymes)
+
+
+#Save data frame as an RData file:
+saveRDS(life_clean13, file = "TAPS_clean.RData")
+
+```
+
+
+```{r}
+
+
+#Question 2
+
+#PCA
+library("FactoMineR")
+library("factoextra")
+
+#1. Conduct a PCA on the policy issues battery
+
+#Extract only the columns pertaining to issues
+issues_by_julia_michaels = life_clean13[, 41:50]
+str(issues_by_julia_michaels)
+
+#Rename variables
+issues_by_julia_michaels = issues_by_julia_michaels %>% rename(tax = ISSUESA1S48,
+                               common_core = ISSUESA2S48, 
+                               immigrant = ISSUESA3S48,
+                               guns = ISSUESA4S48,
+                               marriage = ISSUESA5S48,
+                               abortion = ISSUESA6S48,
+                               keystone = ISSUESA7S48,
+                               ACA = ISSUESA8S48,
+                               greenhouse = ISSUESA9S48,
+                               troops = ISSUESA10S48)
+
+#Convert from character to numeric
+issues_num <- apply(issues_by_julia_michaels,2,function(x) as.numeric(as.factor(x)))
+
+#Do the same for the full dataset (not just the issues columns)
+full_num <- apply(life_clean13,2,function(x) as.numeric(as.factor(x)))
+#dim(full_num)
+
+str(issues_num)
+
+class(issues_num[1,2])
+
+#For ncp, try one less than the total number of components (10 - 1 = 9)
+#Then we can later restrict it to 2
+mypca = PCA(issues_num, ncp = 9, scale.unit = TRUE, graph = TRUE)
+
+
+
+
+#2. Plot this using an elbow plot
+
+#Elbow plot!
+#Taken from Michelle's example code
+par(bg = "khaki")
+plot(1:9, mypca$eig[1:9,1], type="l", main = "Elbow Plot", xlab = "Number of Components", ylab = "Eigenvalues")
+points(1:9, mypca$eig[1:9,1], pch=16, col = "skyblue")
+#str(mypca)
+
+#Summarize
+summary(mypca)
+
+#Can also summarize it in the following way - not sure if this gives us any more important info
+#pca_summary = prcomp(issues_num, scale. = T)
+#pca_summary
+
+#Other summary tools - also not sure if this gains us much but it's kind of cool
+#var_info <- get_pca_var(mypca)
+#var_info$contrib
+#most_important_factors<- apply(var_info$coord, 2, function(x) rownames(var_info$coord)[order(x, decreasing = TRUE)][1:4])
+#most_important_factors
+
+
+#ANSWERS: 
+#Pretty sharp elbow at the third dot
+#Does this mean that the first two or first three components explain most of the variation?
+#Based on the summary, it looks like components 3 and 4 explain similar amounts
+#Thus, I am inclined to say that we should only retain the first two 
+#The summary(pca) tells us directly that the first two dimensions explain 45.48% of the variance.
+
+
+
+#3. Visualize the results regarding the role of the individual policy variables on both the first and second dimension
+
+#This is taken from Michelle's code, but axes = c(1,2) selects the first two (most important) dimensions
+fviz_pca_var(mypca, col.var = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), axes=c(1,2), cex=0.6, select.var = list("contrib"=30), repel = TRUE)
+
+#ANSWERS
+#This plot shows how each variable is correlated with each dimension
+#E.g. it tells us that a higher score on the common core variable is associated with a higher value on both dimensions 1 and 2
+#Specificially, it tells us a lot about the directionality of the correlations
+
+#For the troops variable, it is very strongly correlated with Dimension 2 and not correlated at all with Dimension 1. That is, a higher value on the troops variable will result in a higher value of dimension 2, but will not change the value of dimension 1. 
+
+
+
+
+
+#?fviz_pca_ind()
+
+#How to use fviz_pca_ind?
+#Thanks Ananya!
+#Color based on the party affiliation
+#Add ellipses using Add.Ellipses command. 
+fviz_pca_ind(mypca, geom = c("point"), habillage = as.factor(life_clean13$PID_new), addEllipses = TRUE, ellipse.level = 0.90)
+
+#mypca$var
+
+
+
+
+#Plot the scores of the first dimension vs. the ideological self-placement variable (it has
+#few values so think of a way of making it more visually meaningful), and color the dots
+#by partisanship. What can we learn from this plot?
+
+
+#mypca$ind$coord[,1] #Dimension 1
+
+# Append the first dimension to the existing data frame "issues_num"
+#Resulting data frame is issues_dim
+#Note: This only contain the issues columns
+#To include all columns, use full_num --> full_dim
+issues_dim <- cbind(issues_num, PC1 = mypca$ind$coord[, 1])
+full_dim = cbind(full_num, PC1 = mypca$ind$coord[, 1])
+full_dim = as.data.frame(full_dim)
+#str(full_dim)
+
+library(ggplot2)
+
+
+#Figure out how to color by Party ID. 
+#Add legend
+par(bg = "khaki")
+boxplot(full_dim$PC1 ~ full_dim$LIBCON0S53, 
+        xlab = "Ideology", ylab = "Dimension 1", 
+        main = "Box Plots of Dimension 1 Across Ideologies",
+        col = "skyblue",
+        border = "black")
+points(full_dim$LIBCON0S53, full_dim$PC1, col = full_dim$PID_new, pch = 19, cex = 1)
+legend("bottomleft", 
+       legend = levels(as.factor(life_clean13$PID_new)),  
+       fill = unique(full_dim$PID_new),    
+       title = "Legend Title")             # Legend title
+
+
+#ANSWER
+#What we learn from this plot is that Dems score significantly lower than Reps on Dimension 1
+#Democrats also score higher than Republicans on the ideological self-placement variable
+#Generally, there is an inverse correlation between Dimension 1 and ideology
+#The three independents seem to be spread rather randomly
+
+
+
+
+#Extract row with highest value of PC1 (Dimension 1)
+high_guy <- full_dim %>% filter(PC1 == max(PC1))
+#There are two respondents - choose the first one
+#wustlid = 414
+#Demographics: 
+
+#See below for how I got the numbers for each factor
+
+#gendersp = 2 (Male)
+#RACE_COMBINED = 3 (Other, Non-Hispanic)
+#ppagect4 = 3 (45-59)
+#ppeducat = 2 (High school)
+#income6 = 1 (Under $10,000)
+#PID7_MAXN = 6 (Strong Democrat)
+
+#The demographics of the high guy are male, other race, non-hispanic, middle-aged, high school educated, makes less than $10K a year, and is a strong democrat. 
+
+
+#Translate numbers into actual demographics
+#ChatGPT helped me with this code. 
+
+# Get the levels of the gendersp column
+gender_levels <- levels(life_clean13$gendersp)
+
+# Print the levels and their numeric values
+cat("Levels and their numeric values:\n")
+for (i in 1:length(gender_levels)) {
+  cat(i, ": ", gender_levels[i], "\n")
+}
+
+race_levels <- levels(life_clean13$RACE_COMBINED)
+
+# Print the levels and their numeric values
+cat("Levels and their numeric values:\n")
+for (i in 1:length(race_levels)) {
+  cat(i, ": ", race_levels[i], "\n")
+}
+
+
+age_levels <- levels(life_clean13$ppagect4)
+
+# Print the levels and their numeric values
+cat("Levels and their numeric values:\n")
+for (i in 1:length(age_levels)) {
+  cat(i, ": ", age_levels[i], "\n")
+}
+
+
+educ_levels <- levels(life_clean13$ppeducat)
+
+# Print the levels and their numeric values
+cat("Levels and their numeric values:\n")
+for (i in 1:length(educ_levels)) {
+  cat(i, ": ", educ_levels[i], "\n")
+}
+
+income_levels <- levels(life_clean13$income6)
+
+# Print the levels and their numeric values
+cat("Levels and their numeric values:\n")
+for (i in 1:length(income_levels)) {
+  cat(i, ": ", income_levels[i], "\n")
+}
+
+
+#This one is different bc it's a character variable rather than a factor
+pid_values <- unique(life_clean13$PID7_MAXN)
+
+# Print the values
+cat("Unique character values:\n")
+for (i in 1:length(pid_values)) {
+  cat(i, ": ", pid_values[i], "\n")
+}
+
+
+
+
+#Do the same thing for the low guy
+low_guy = full_dim %>% filter(PC1 == min(PC1))
+#There are 16 responses - choose the first one
+#wustlid = 1021
+
+#Demographics: 
+
+#See above for how I got the numbers for each factor
+
+#gendersp = 1 (Refused)
+#RACE_COMBINED = 3 (Other, Non-Hispanic)
+#ppagect4 = 3 (45-59)
+#ppeducat = 3 (Some College)
+#income6 = 6 ($100,000 or more)
+#PID7_MAXN = 3 (Not very strong Republican) #So we can assume they don't go to the gym
+
+
+
+
+
+
+
+
+
+
+
+#Note: Knitting after this question worked fine
+#Any issues with knitting at the end will be in the Problem 3 code chunk
+```
+
+
+
+```{r}
+#Problem 3
+
+#Split data into training, validation, and testing sets
+
+#Load libraries
+library(rsample)
+library(glmnet) # For Ridge and LASSO
+
+#Set seed
+set.seed(115)
+
+#str(life_clean13)
+
+#Initial split into training and other
+first_split <- initial_split(life_clean13, prop = .35, strata = "PID_new") # 35% for training
+life_train <- training(first_split)
+life_other  <- testing(first_split)
+
+second_split = initial_split(life_other, prop = .385, strata = "PID_new") #25% total, thus 38.5% of non-training set
+life_validation = training(second_split)
+life_testing = testing(second_split)
+
+dim(life_train)
+dim(life_validation)
+dim(life_testing)
+
+#Now we have three subsets - training, testing, validation. Whoopie!
+
+#1. Run a basic model using training dataset
+#Try ordered logit
+library(MASS)
+
+# Fit an ordinal logistic regression model
+
+#Note: The instructions said to choose a subset of covariates
+#Not a good or reasonable subset of covariates
+#Thus...
+
+model1 <- polr(as.factor(PID_new) ~ as.factor(ISSUESA1S48) + as.factor(ISSUESA2S48) + as.factor(ISSUESA3S48), data = life_train, Hess = TRUE)
+summary(model1)
+
+
+#Note: We get a warning that the design is rank-deficient, so some coefs were dropped
+#I ignored this
+model2 <- polr(as.factor(PID_new) ~ as.factor(gendersp) + as.factor(RACE_COMBINED), data = life_train, Hess = TRUE)
+summary(model2)
+
+model3 <- polr(as.factor(PID_new) ~ as.factor(ISSUESA4S48) + as.factor(ISSUESA5S48) + as.factor(ISSUESA6S48), data = life_train, Hess = TRUE)
+summary(model3)
+
+
+model4 <- polr(as.factor(PID_new) ~ as.factor(ISSUESA7S48) + as.factor(ISSUESA8S48) + as.factor(ISSUESA9S48), data = life_train, Hess = TRUE)
+summary(model4)
+
+
+model5 <- polr(as.factor(PID_new) ~ as.factor(ISSUESA10S48) + as.factor(ppeducat) + as.factor(ppagect4) + as.factor(income6), data = life_train, Hess = TRUE)
+summary(model5)
+
+
+
+
+
+preds_model2 <- predict(model2, new_data = life_validation)
+#preds_model2
+
+preds_model1 <- predict(model1, new_data = life_validation)
+#preds_model1
+
+preds_model3 <- predict(model3, new_data = life_validation)
+#preds_model3
+
+preds_model4 <- predict(model4, new_data = life_validation)
+#preds_model4
+
+preds_model5 <- predict(model5, new_data = life_validation)
+#preds_model5
+
+length(preds_model1)
+length(preds_model2)
+length(preds_model3)
+length(preds_model4)
+length(preds_model5)
+
+#Append predictions to the dataframe with real PID_new values:
+#Note: I ran into issues with dataset length here. 
+actual = life_validation$PID_new
+actual = as.factor(actual)
+
+act_train = life_train$PID_new
+act_train = as.factor(act_train)
+
+length(actual)
+dim(life_validation)
+
+length(act_train)
+
+#Create data frame
+# Combine the vectors into a data frame
+val <- data.frame(
+  Model1_Predictions = preds_model1,
+  Model2_Predictions = preds_model2,
+  Model3_Predictions = preds_model3,
+  Model4_Predictions = preds_model4,
+  Model5_Predictions = preds_model5,
+  Real_Values = act_train
+)
+
+
+#Create numeric version of val data frame
+val_af <- val %>% mutate_all(~ as.numeric(.))
+
+
+
+
+#Following Ortiz (2023), I will report variance, MSE, and R^2 values
+#Thanks Emily!
+#Actually I will report residual deviance (lower is better) instead of R^2
+
+dim(val_af)[1]
+#MSE:
+mse_val_1 = sum((val_af$Model1_Predictions - val_af$Real_Values)^2)/dim(val_af)[1]
+#mse_val_1
+mse_val_2 = sum((val_af$Model2_Predictions - val_af$Real_Values)^2)/dim(val_af)[1]
+#mse_val_2
+mse_val_3 = sum((val_af$Model3_Predictions - val_af$Real_Values)^2)/dim(val_af)[1]
+#mse_val_3
+mse_val_4 = sum((val_af$Model4_Predictions - val_af$Real_Values)^2)/dim(val_af)[1]
+#mse_val_4
+mse_val_5 = sum((val_af$Model5_Predictions - val_af$Real_Values)^2)/dim(val_af)[1]
+#mse_val_5
+
+#Model with lowest MSE is model 4
+
+#Variance: 
+var_val_1 <- var(val_af$Model1_Predictions)
+#var_val_1
+var_val_2 <- var(val_af$Model2_Predictions)
+#var_val_2
+var_val_3 <- var(val_af$Model3_Predictions)
+#var_val_3
+var_val_4 <- var(val_af$Model4_Predictions)
+#var_val_4
+var_val_5 <- var(val_af$Model5_Predictions)
+#var_val_5
+
+#Model with lowest variance is model 1
+
+#Residual Deviance:
+residual_deviance_1 <- deviance(model1)
+#residual_deviance_1
+residual_deviance_2 <- deviance(model2)
+#residual_deviance_2
+residual_deviance_3 <- deviance(model3)
+#residual_deviance_3
+residual_deviance_4 <- deviance(model4)
+#residual_deviance_4
+residual_deviance_5 <- deviance(model5)
+#residual_deviance_5
+
+#Model with lowest residual deviance is model 4 
+
+#Make a table summarizing results:
+#Thanks again to Emily for this formatting!
+mse <- c(mse_val_1, mse_val_2, mse_val_3, mse_val_4, mse_val_5)
+var <- c(var_val_1, var_val_2, var_val_3, var_val_4, var_val_5)
+r_dev <- c(residual_deviance_1, residual_deviance_2, residual_deviance_3, residual_deviance_4, residual_deviance_5)
+
+#Create table
+fit_stats <- tibble(mse = mse,
+                   var = var,
+                   r_dev = r_dev)
+
+#Display the table
+fit_stats
+
+
+#Overall, I would say that the best model is model 4
+#So use this one for the test dataset
+#Use this model to predict PID in the test dataset
+
+preds_test <- predict(model4, new_data = life_testing)
+#preds_test
+
+#Report MSE, variance, and residual deviance for this model's predictions on the test dataset
+
+#Create new data frame: test_results
+
+test_results = data.frame(
+  test_pred = preds_test,
+  real_values = act_train
+)
+
+test_af <- test_results %>% mutate_all(~ as.numeric(.))
+
+mse_test_1 = sum((test_af$test_pred - test_af$real_values)^2)/dim(test_af)[1]
+mse_test_1
+
+var_test_1 <- var(test_af$test_pred)
+var_test_1
+
+r_dev_test_1 <- deviance(model4)
+r_dev_test_1
+
+#Model performed equally well on test set and validation set. 
+
+
+
+#Potential problems: 
+
+#By far the biggest problem:
+#Could not get the predict function to work on anything other than the training data
+#Thus, all of the results are wrong and meaningless
+#Because the values being predicted are the same as the values the model was trained on
+#Could not find the error causing this
+#The error occus in the preds_model lines
+#The output of the preds_models are 494 observations long
+#Which is the length of the training dataset
+#Thus, the only thing these predictions can be compared to is the training set
+#To fix this issue, the preds_model lines must be fixed somehow
+#(Which may require fixing the model lines)
+#And the "real_values" columns in the testing and validation data frames should be replaced
+#With the real values from the testing set and validation set. 
+#Attempts to fix this are written below. None worked, but some might be close.
+
+#Other issues:
+#My choice of variables was pretty random
+#Unclear whether the best of my 5 models is actually the best possible model (definitely isn't, but hard to tell for sure)
+#Lots of issues with data types
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Remember to knit after this question!
+
+
+
+
+
+
+#Alternative methods
+
+#1. Using multinomial logistic regression
+
+
+#library(nnet)
+
+# Fit a multinomial logistic regression model
+#m1 <- multinom(PID_new ~ ISSUESA1S48 + ISSUESA2S48 + ISSUESA3S48, data = life_train)
+#summary(m1)
+
+#m2 = multinom(PID_new ~ gendersp + RACE_COMBINED, data = life_train)
+#summary(m2)
+
+#m3 = multinom(PID_new ~ ISSUESA4S48 + ISSUESA5S48 + ISSUESA6S48, data = life_train)
+#summary(m3)
+
+#m4 = multinom(PID_new ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data = life_train)
+#summary(m4)
+
+#m5 = multinom(PID_new ~ ISSUESA10S48 + ppeducat + ppagect4 + income6, data = life_train)
+#summary(m5)
+
+
+
+
+
+#preds_m2 <- predict(m2, new_data = life_validation)
+#preds_m2
+
+#preds_m1 <- predict(m1, new_data = life_validation)
+#preds_m1
+
+#preds_m3 <- predict(m3, new_data = life_validation)
+#preds_m3
+
+#preds_m4 <- predict(m4, new_data = life_validation)
+#preds_m4
+
+#preds_m5 <- predict(m5, new_data = life_validation)
+#preds_m5
+
+
+#2. Logits
+#logit1 = glm(as.factor(PID_new) ~ as.factor(ISSUESA1S48) + as.factor(ISSUESA2S48) + as.factor(ISSUESA3S48), data = life_train)
+
+#logit1 = glm(PID_new ~ ISSUESA1S48 + ISSUESA2S48 + ISSUESA3S48, family = binomial, data = life_train)
+  
+#  model <- glm(response_variable ~ predictor_variables, family = binomial, data = your_data)
+
+#model1 <- polr(as.factor(PID_new) ~ as.factor(ISSUESA1S48) + as.factor(ISSUESA2S48) + as.factor(ISSUESA3S48), data = life_train, Hess = TRUE)
+#summary(model1)
+#Predictions
+
+#Again we will have to factorize all our variables:
+
+#Create factorized dataset
+#life_validation_factorized <- life_validation
+
+#Convert variables to factors
+# Check and align factor levels in the validation data
+#life_validation_factorized$gendersp <- factor(life_validation_factorized$gendersp, levels = levels(life_train$gendersp))
+#life_validation_factorized$RACE_COMBINED <- factor(life_validation_factorized$RACE_COMBINED, levels = #levels(life_train$RACE_COMBINED))
+
+# Make predictions
+#preds_model2 <- predict(model2, data.frame(life_validation_factorized[, c("gendersp", "RACE_COMBINED")]))
+
+#?predict()
+
+
+#dim(life_train)
+#dim(life_validation)
+
+
+
+#Solve this by using logit - make it simpler
+
+#
+
+
+
+
+```

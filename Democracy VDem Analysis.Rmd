@@ -1,0 +1,2651 @@
+---
+title: "Democracy V-Dem"
+author: "Josh Goetz"
+date: "11/27/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+#Install Packages
+library(tidyverse)
+library(ggplot2)
+
+#Download data
+vdem = readRDS("V-Dem-CY-Core-v12.rds")
+
+#View data
+#View(vdem)
+#dim(vdem)
+
+#Subset data - only 2021 values
+vdem2021 = vdem %>% subset(year == 2021)
+#View(vdem2021)
+dim(vdem2021)
+#179 countries, 1818 variables
+#Good enough size
+
+#Create new variables  measuring democracy and liberalism
+
+#First idea: Use existing variables
+#e_boix_regime (Boix minimalist democracy definition) for Democracy
+#v2xcl_rol (Individual liberties and rule of law) used for Liberalism
+#Select only these columns
+#vdem2021two = vdem2021 %>% select(e_boix_regime, v2xcl_rol)
+#This didn't work b/c these indices aren't in the dataset I'm looking at
+
+#Use other data set which hopefully has it
+vdemBig = readRDS("V-Dem-CY-Full+Others-v12.rds")
+#View(vdemBig)
+
+#Ignore this crap - scatterplot attempt
+vvvvv = vdemBig %>% select(e_boix_regime)
+#vvvvv %>% View()
+vdemBig2021DL = vdemBig %>% subset(year == 2021) %>% select(e_boix_regime, v2xcl_rol, e_fh_cl)
+#View(vdemBig2021DL)
+
+#Find the average of the two indicators every year, then plot them
+
+#Note: I initially used v2xcl_rol, but then I found v2x_liberal,
+#Which is a better liberalism metric
+#Note: v2x_liberal is LIBCOMP (liberal component index)
+avDL = vdemBig %>% group_by(year) %>% summarize(
+  avgDEM = mean(e_boix_regime, na.rm = TRUE), 
+  avgLIB =  mean(v2xcl_rol, na.rm = TRUE),
+  avgCIVLIB = mean(e_fh_cl, na.rm = TRUE),
+  avgLIBCOMP = mean(v2x_liberal, na.rm = TRUE))
+#View(avDL)
+
+ggplot(avDL, aes(year)) + 
+  geom_line(aes(y = avgDEM, colour = "avgDEM")) +   
+  geom_line(aes(y = avgLIB, colour = "avgLIB")) +
+  geom_line(aes(y = avgLIBCOMP, colour = "avgLIBCOMP")) +
+              xlim(1980,2021) +
+              ylim(0,1) +
+  xlab("Year") + ylab ("Global Mean Indicator Score") +
+  ggtitle("Avgerage Score for Proxy Democracy and Liberalism Indicators")
+
+avDL2021 = avDL %>% subset(year == 2021)
+#View(avDL2021)
+#Calculate difference from highest point to most recent point
+#Peak was in 2011 at 0.5848
+diffDEM = 0.5813953 - max(avDL$avgDEM, na.rm = TRUE)
+diffDEM
+#0.00340
+diffLIB = 0.6606089 - max(avDL$avgLIB, na.rm = TRUE)
+diffLIB
+#0.0369
+#Liberalism's drop is ten times democracy's. Both are very small. 
+
+#Liberal component index
+diffLIBCOMP = avDL2021$avgLIBCOMP - max(avDL$avgLIBCOMP, na.rm = TRUE)
+diffLIBCOMP
+#0.0241676
+#Use this for furture research. 
+
+#Instead, use freedom of expression for liberalism, free and fair elections for democracy
+vdem2021two = vdem2021 %>% select(v2x_freexp_altinf, v2xel_frefair)
+
+
+
+
+
+#View(vdem2021two)
+#plot(vdem2021$v2x_freexp_altinf, vdem2021$v2xel_frefair)
+#text(vdem2021$v2x_freexp_altinf ~ vdem2021$v2xel_frefair, 
+#     labels=rownames(country_name),data=vdem2021, cex=0.9, font=2)
+#Another try, said I 
+#vdem2021 %>% plot(vdem2021$v2x_freexp_altinf ~ vdem2021$v2xel_frefair)
+#text(vdem2021$v2x_freexp_altinf ~ vdem2021$v2xel_frefair, 
+#     labels=rownames(country_name),data=vdem2021, cex=0.9, font=2)
+
+#Try a labelled ggplot; i.e. with every country labelled
+#ggplot(vdem2021, aes(x = vdem2021$v2xel_frefair, y = vdem2021$v2xfreexp_altinf))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Now do the same thing, but plot frefair against suffr and suffr against freexp
+#In this way, we can compare D to L, D to D, and D to L. 
+#If my theory is correct, we should see much more of a straight line between
+#D and D than between either D and L pair (dyad). Let's see:
+#I also tried adding in v2x_elecoff
+vDL2 = vdem2021 %>% select(v2x_freexp_altinf, v2xel_frefair, v2x_suffr, v2x_elecoff)
+#View(vDL2)
+plot(vDL2$v2x_freexp_altinf, vDL2$v2x_suffr)
+plot(vDL2$v2x_suffr, vDL2$v2xel_frefair)
+plot(vDL2$v2xel_frefair, vDL2$v2x_elecoff)
+#This analysis doesn't work b/c suffr is 1 for almost every case. 
+#I don't think any meaningful results can be gleaned from this. 
+
+#Create an average for each year of suffrage variable
+#avyearfreexp = vdem %>% group_by(year) %>% summarize(avgSuffr = mean(v2x_suffr, na.rm = TRUE))
+#plot(avyearfreexp$year, avyearfreexp$avgSuffr, xlim = c(1980,2020), ylim = c(0.6,1))
+#View(avyearfreexp)
+
+#Now do the same for all variables of interest
+avyear = vdem %>% group_by(year) %>% summarize(
+  avgSUFFR = mean(v2x_suffr, na.rm = TRUE), 
+  avgFFE =  mean(v2xel_frefair, na.rm = TRUE), 
+  avgFEXP = mean(v2x_freexp_altinf, na.rm = TRUE), 
+  avgELOFF = mean(v2x_elecoff, na.rm = TRUE),
+  avgASSOC = mean(v2x_frassoc_thick, na.rm = TRUE))
+
+
+ggplot(avyear, aes(year)) + 
+  geom_line(aes(y = avgSUFFR, colour = "avgSUF")) +   
+  geom_line(aes(y = avgFFE, colour = "avgFFE")) +
+  geom_line(aes(y = avgFEXP, colour = "avgFXP")) +
+  geom_line(aes(y = avgELOFF, colour = "avgELO")) +
+  geom_line(aes(y = avgASSOC, colour = "avgFRA")) +
+              xlim(1980,2021) +
+              ylim(0.3,1) + xlab("Year") + ylab("Mean Sub-Index Score") + 
+  ggtitle("Global Average V-Dem Sub-Index Score Over Time")
+
+avyear2021 = avyear %>% subset(year == 2021)
+
+#Examine drops
+diffSUF = avyear2021$avgSUFFR - max(avyear$avgSUFFR, na.rm = TRUE)
+diffSUF
+#0.009726
+diffFFE = avyear2021$avgFFE - max(avyear$avgFFE, na.rm = TRUE)
+diffFFE
+#0.0184581
+diffFEXP = avyear2021$avgFEXP - max(avyear$avgFEXP, na.rm = TRUE)
+diffFEXP
+#0.054978
+diffELO = avyear2021$avgELOFF - max(avyear$avgELOFF, na.rm = TRUE)
+diffELO
+#0.033687
+diffFRA = avyear2021$avgASSOC - max(avyear$avgASSOC, na.rm = TRUE)
+diffFRA
+#0.042676
+
+
+
+
+
+
+
+#Now do it again with the indicators of the frassoc_thick variable
+#This is the only one divided between democracy and liberalism
+avyear2 = vdem %>% group_by(year) %>% summarize(
+  avgPARTYBAN = mean(v2psparban, na.rm = TRUE), 
+  avgPARTYBARR =  mean(v2psbars, na.rm = TRUE), 
+  avgPARTYOPP = mean(v2psoppaut, na.rm = TRUE), 
+  avgMULTIEL = mean(v2elmulpar, na.rm = TRUE),
+  avgCSOENTRY = mean(v2cseeorgs, na.rm = TRUE),
+  avgCSOSUPP = mean(v2csreprss, na.rm = TRUE),
+  avgELECREG = mean(v2x_elecreg, na.rm = TRUE))
+
+#Take out multiel, as it measures the same thing as elecreg
+#And it is very spiky
+ggplot(avyear2, aes(year)) + 
+  geom_line(aes(y = avgPARTYBAN, colour = "avgPARTYBAN")) +   
+  geom_line(aes(y = avgPARTYBARR, colour = "avgPARTYBARR")) +
+  geom_line(aes(y = avgPARTYOPP, colour = "avgPARTYOPP")) +
+  #geom_line(aes(y = avgMULTIEL, colour = "avgMULTIEL")) +
+  geom_line(aes(y = avgCSOENTRY, colour = "avgCSOENTRY")) +
+  geom_line(aes(y = avgCSOSUPP, colour = "avgCSOSUPP")) +
+  geom_line(aes(y = avgELECREG, colour = "avgELECREG")) +
+              xlim(1980,2021) + ylim(-1,1.3) +
+  xlab("Year") + ylab ("Mean Indicator Score") +
+  ggtitle("Global Average Indicator Score for V-Dem's FRA Sub-Index")
+
+
+
+#View(avyear2)
+
+#Subset the dataframe to include just the 2021 values.
+avyear3 = avyear2 %>% subset(year == 2021)
+#View(avyear3)
+avyear3$avgPARTYBAN
+#Calculate difference from highest point to most recent point
+diffPARTYBAN = avyear3$avgPARTYBAN - max(avyear2$avgPARTYBAN, na.rm = TRUE)
+diffPARTYBAN
+#0.1936089
+diffPARTYBARR = avyear3$avgPARTYBARR - max(avyear2$avgPARTYBARR, na.rm = TRUE)
+diffPARTYBARR
+#0.1717598
+diffPARTYOPP = avyear3$avgPARTYOPP - max(avyear2$avgPARTYOPP, na.rm = TRUE)
+diffPARTYOPP
+#0.1275
+diffCSOENTRY = avyear3$avgCSOENTRY - max(avyear2$avgCSOENTRY, na.rm = TRUE)
+diffCSOENTRY
+#0.2360447
+diffCSOSUPP = avyear3$avgCSOSUPP - max(avyear2$avgCSOSUPP, na.rm = TRUE)
+diffCSOSUPP
+#0.3021844
+diffELECREG = avyear3$avgELECREG - max(avyear2$avgELECREG, na.rm = TRUE)
+diffELECREG
+#0.03910615
+
+
+
+#Recreate Treisman parabola
+#Need GDP per capita and minimalist defintion of democracy 
+#Try using free and fair elections for minimalist democracy,
+#since suffrage is roughly 100% everywhere and frassoc is mixed.
+#parab = vdemBig %>% subset(year == 2021) %>% select(v2xel_frefair, vdemBig$e_migdppc)
+#Ah nvm they didn't include gdp variable in the dataset
+```
+
+
+```{r}
+#Do the frassoc_thick disaggregated analysis again, but this time do median instead of mean
+#Never mind, this didn't seem to work. 
+
+Medianyear2 = vdem %>% group_by(year) %>% summarize(
+  medPARTYBAN = median(v2psparban, na.rm = TRUE), 
+  medPARTYBARR =  median(v2psbars, na.rm = TRUE), 
+  medPARTYOPP = median(v2psoppaut, na.rm = TRUE), 
+  medMULTIEL = median(v2elmulpar, na.rm = TRUE),
+  medCSOENTRY = median(v2cseeorgs, na.rm = TRUE),
+  medCSOSUPP = median(v2csreprss, na.rm = TRUE),
+  medELECREG = median(v2x_elecreg, na.rm = TRUE))
+View(Medianyear2)
+
+#Take out multiel, as it measures the same thing as elecreg
+#And it is very spiky
+ggplot(Medianyear2, aes(year)) + 
+  geom_line(aes(y = medPARTYBAN, colour = "avgPARTYBAN")) +   
+  geom_line(aes(y = medPARTYBARR, colour = "avgPARTYBARR")) +
+  geom_line(aes(y = medPARTYOPP, colour = "avgPARTYOPP")) +
+  #geom_line(aes(y = medMULTIEL, colour = "avgMULTIEL")) +
+  geom_line(aes(y = medCSOENTRY, colour = "avgCSOENTRY")) +
+  geom_line(aes(y = medCSOSUPP, colour = "avgCSOSUPP")) +
+  geom_line(aes(y = medELECREG, colour = "avgELECREG")) +
+              xlim(2000,2021) + ylim(0.8,1.3)
+```
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+#FREFAIR vs. FREEXP_ALTINF - each decade
+
+
+#Plot free and fair elections (stand-in for democracy) against 
+#Freedom of expression (stand-in for liberalism) every decade from 1980 to present
+#Label countries, and include regression line with R-squared (R2) value.
+
+#Main idea: See if the two strands are separating
+
+#Repeat for 1980
+vdem1980 = vdem %>% subset(year == 1980)
+plot(v2xel_frefair ~ v2x_freexp_altinf, col="lightblue", pch=19, cex=2,data=vdem1980)
+
+abline(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem1980), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem1980))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_freexp_altinf, 
+     labels=country_name, data=vdem1980, cex=0.9, font=0.5, pos=4)
+
+#1990
+
+vdem1990 = vdem %>% subset(year == 1990)
+plot(v2xel_frefair ~ v2x_freexp_altinf, col="lightblue", pch=19, cex=2,data=vdem1990)
+
+abline(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem1990), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem1990))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_freexp_altinf, 
+     labels=country_name, data=vdem1990, cex=0.9, font=0.5, pos=4)
+
+#And 2000
+vdem2000 = vdem %>% subset(year == 2000)
+plot(v2xel_frefair ~ v2x_freexp_altinf, col="lightblue", pch=19, cex=2,data=vdem2000)
+
+abline(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem2000), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem2000))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_freexp_altinf, 
+     labels=country_name, data=vdem2000, cex=0.9, font=0.5, pos=4)
+
+#And 2010
+vdem2010 = vdem %>% subset(year == 2010)
+plot(v2xel_frefair ~ v2x_freexp_altinf, col="lightblue", pch=19, cex=2,data=vdem2010)
+
+abline(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem2010), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem2010))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_freexp_altinf, 
+     labels=country_name, data=vdem2010, cex=0.9, font=0.5, pos=4)
+
+
+#2021
+
+plot(v2xel_frefair ~ v2x_freexp_altinf, col="lightblue", pch=19, cex=2,data=vdem2021)
+
+abline(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem2021), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_freexp_altinf, data = vdem2021))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_freexp_altinf, 
+     labels=country_name, data=vdem2021, cex=0.9, font=0.5, pos=4)
+```
+
+```{r pressure, echo=FALSE}
+#FREFAIR vs. LIBCOMP - each decade
+
+
+#Plot free and fair elections (stand-in for democracy) against 
+#Liberal component (v2x_liberal) (stand-in for liberalism) every decade from 1980 to present
+#Label countries, and include regression line with R-squared (R2) value.
+
+#Main idea: See if the two strands are separating
+
+#Repeat for 1980
+vdem1980 = vdem %>% subset(year == 1980)
+plot(v2xel_frefair ~ v2x_liberal, col="lightblue", pch=19, cex=2,data=vdem1980)
+
+abline(lm(v2xel_frefair ~ v2x_liberal, data = vdem1980), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_liberal, data = vdem1980))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_liberal, 
+     labels=country_name, data=vdem1980, cex=0.9, font=0.5, pos=4)
+
+#1990
+
+vdem1990 = vdem %>% subset(year == 1990)
+plot(v2xel_frefair ~ v2x_liberal, col="lightblue", pch=19, cex=2,data=vdem1990)
+
+abline(lm(v2xel_frefair ~ v2x_liberal, data = vdem1990), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_liberal, data = vdem1990))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_liberal, 
+     labels=country_name, data=vdem1990, cex=0.9, font=0.5, pos=4)
+
+#And 2000
+vdem2000 = vdem %>% subset(year == 2000)
+plot(v2xel_frefair ~ v2x_liberal, col="lightblue", pch=19, cex=2,data=vdem2000)
+
+abline(lm(v2xel_frefair ~ v2x_liberal, data = vdem2000), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_liberal, data = vdem2000))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_liberal, 
+     labels=country_name, data=vdem2000, cex=0.9, font=0.5, pos=4)
+
+#And 2010
+vdem2010 = vdem %>% subset(year == 2010)
+plot(v2xel_frefair ~ v2x_liberal, col="lightblue", pch=19, cex=2,data=vdem2010)
+
+abline(lm(v2xel_frefair ~ v2x_liberal, data = vdem2010), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_liberal, data = vdem2010))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_liberal, 
+     labels=country_name, data=vdem2010, cex=0.9, font=0.5, pos=4)
+
+
+#2021
+
+plot(v2xel_frefair ~ v2x_liberal, col="lightblue", pch=19, cex=2,data=vdem2021)
+
+abline(lm(v2xel_frefair ~ v2x_liberal, data = vdem2021), col="red", lwd=3)
+legend("topleft",legend=paste("R2 is", format(summary(lm(v2xel_frefair ~ v2x_liberal, data = vdem2021))$r.squared,digits=3)))
+text(v2xel_frefair ~ v2x_liberal, 
+     labels=country_name, data=vdem2021, cex=0.9, font=0.5, pos=4)
+```
+
+```{r}
+#Reproduce Skaaning's graphic:
+vdem %>% group_by(year) %>% mutate(avScore = mean(v2x_polyarchy, na.rm = TRUE)) %>%
+                                     ggplot(aes(x = year, y = avScore)) + 
+  xlim(1900,2021) + 
+  geom_line() +
+  ylab("Average V-Dem score on polyarchy index") +
+  xlab("Year")
+
+?ggplot
+```
+Examine US individually:
+```{r}
+#Now look at just the US
+vdemUS = vdem %>% subset(country_text_id == "USA")
+
+  ggplot(vdemUS, aes(year)) + 
+  geom_line(aes(y = v2x_polyarchy, colour = "Polyarchy")) +   
+  geom_line(aes(y = v2xel_frefair, colour = "FFE")) +
+  geom_line(aes(y = v2x_frassoc_thick, colour = "FRA")) +
+  geom_line(aes(y = v2x_suffr, colour = "SUF")) +
+  geom_line(aes(y = v2x_freexp_altinf, colour = "FXP")) +
+  geom_line(aes(y = v2x_elecoff, colour = "ELO")) +
+              xlim(1980,2021) +
+    ylim(0.75,1) +
+  ylab("Average V-Dem Score for each indicator") +
+  xlab("Year")
+
+?ggplot
+```
+
+
+```{r}
+#Boix et al 2013 definition + women's suffrage
+Boix = read.csv("Boix regimes democracy.csv")
+head(Boix)
+BoixWorld = Boix %>%  group_by(Year) %>% summarize(
+  avgBoix = mean(regime_womsuffr_bmr_owid, na.rm = TRUE))
+#Note: Here I use mean instead of count b/c the total number of countries in the world might change each year
+#It is the perecent of democracies we are interested in, not the number. 
+head(BoixWorld)
+BoixWorld
+BoixWorld %>% ggplot(aes(x = Year, y = avgBoix)) + 
+  xlim(1990,2021) + 
+  ylim(0.3,0.7) +
+  geom_line() +
+  ylab("World Average Score on Boix index") +
+  xlab("Year") +
+  ggtitle("Portion of the World Coded as Democracies by Boix et al, with women's suffrage")
+
+#Max value is 0.61139896	
+#Has it declined at all from peak, or is it at it's peak now?
+AtPeak <- (max(BoixWorld$avgBoix) == 0.61139896)
+AtPeak
+#False - we are not at the peak and thus we have declined.
+#By how much?
+Drop = 0.61139896	- max(BoixWorld$avgBoix)
+Drop #-0.005181
+```
+
+```{r}
+#Freedom House
+
+#Look at Political Rights index first
+FH = read.csv("Freedom House Data.csv")
+head(FH)
+#First row is column headers - fix that:
+names(FH) <- FH[1,] #Make headers the first row
+FH = FH[-1,] #Delete first row
+head(FH)
+str(FH)
+#Looks good!
+FHovertime = FH %>% group_by(Edition) %>% mutate(avPR = mean("PR Rating", na.rm = TRUE))
+FHovertimePR = FHovertime %>% select(avPR)
+
+FHovertimePR
+
+#Then look at Civil Liberties Index
+
+
+```
+
+
+```{r}
+#FFE vs. LIBCOMP
+#Compare liberalism to democracy over time
+#Looking at v2x_liberal for liberalism and v2xel_frefair for democracy
+
+vdemFFEvLIB2021 = vdem2021 %>% select(v2x_liberal, v2xel_frefair)
+head(vdemFFEvLIB2021)
+plot(vdemFFEvLIB2021$v2x_liberal, vdemFFEvLIB2021$v2xel_frefair)
+
+#Now repeat for 1980, 1990, 2000, 2010:
+
+
+```
+
+
+```{r}
+#Try to isolate liberalism from democracy in order to see which is more important
+
+#Idea 1: 
+#Find the countries which have the biggest difference in liberalism and democracy score,
+#in each direction
+#I.e. find top five countries where lib score >>> dem score by the biggets margin
+#and the top five countries where dem score >>> lib score by the biggest margin
+#Drawback: Since there are no liberal autocracies, this will probably 
+#end up selecting 5 illiberal autocracies where lib > dem
+#And 5 liberal democracies where dem > lib
+
+#Try with libcomp standing in for liberalism and v2x_polyarchy for democracy
+library(dplyr)
+
+#Subset dataset - Find countries where lib score > dem score
+vdem2021LGD = vdem2021 %>% mutate(libMinusDem = v2x_liberal - v2x_polyarchy)
+vdem2021LGD = vdem2021LGD %>% subset(v2x_liberal > v2x_polyarchy) %>% select(country_name, country_text_id, country_id, libMinusDem, v2x_liberal, v2x_polyarchy)
+#View(vdem2021LGD)
+#?arrange
+vdem2021LGD = vdem2021LGD %>% arrange(desc(libMinusDem))
+vdem2021LGD10 = vdem2021LGD[1:10,]
+LGDavPoly = mean(vdem2021LGD10$v2x_polyarchy)
+View(vdem2021LGD10)
+LGDavPoly #0.3551 = Average polyarchy score for top 10
+
+
+#Top 5 average polyarchy score = 0.3294
+
+#Subset dataset the other way- Find countries where lib score < dem score
+vdem2021DGL = vdem2021 %>% mutate(demMinusLib = v2x_polyarchy - v2x_liberal)%>% subset(v2x_liberal < v2x_polyarchy) %>% select(country_name, country_text_id, country_id, demMinusLib, v2x_liberal, v2x_polyarchy)
+vdem2021DGL = vdem2021DGL %>% arrange(desc(demMinusLib))
+#View(vdem2021DGL)
+vdem2021DGL10 = vdem2021DGL[1:10,]
+View(vdem2021DGL10)
+DGLavPoly = mean(vdem2021DGL10$v2x_polyarchy)
+DGLavPoly #0.366 = Average polyarchy score for the top 10
+#They are similar - that's good.
+#There also appears to be reasonable geographic distribution
+#Not sure about GDP or other possible confounders
+#LGD are much more liberal than DGL
+
+
+
+#Idea 2: 
+#Find countries that are doing these four things:
+#Becoming more liberal but not moving on the democracy scale
+#Becoming more democratic but not moving on the liberalism scale
+#Becoming less liberal but not moving on the democracy scale
+#Becoming less democratic but not moving on the liberalism scale
+  #Then, see which direction is associated with improvments on social goods provision
+  #Case for Democracy
+#Note: The drawback here is it assumes no interaction effect
+
+#View(vdem)
+
+```
+
+
+```{r}
+#Annual CO2 Emissions by country
+
+#Load dataset on carbon emissions from this website: 
+#https://ourworldindata.org/co2-dataset-sources
+
+CarbonData = read.csv("annual-co2-emissions-per-country.csv")
+
+library(dplyr)
+#CarbonData %>% View()
+#vdem %>% View()
+#vdem %>% View()
+
+#Join datasets together - Join this one with main vdem
+vdemCarbon <- vdem %>% left_join(CarbonData, by = c("country_name" = "Entity", "year" = "Year"))
+#View(vdemCarbon)
+sum(is.na(vdemCarbon$Annual.COâ...emissions))
+
+#examine which ones weren't joined
+anti_vdemCarbon = anti_join(vdem, CarbonData, by = c("country_name" = "Entity", "year" = "Year"))
+length(anti_vdemCarbon)
+dim(anti_vdemCarbon)
+#View(anti_vdemCarbon)
+#Not sure if this is good or not. Red Flag?
+#Actually, I think this is ok. There were 11997 NAs in the CO2 emissions column in the joined dataset
+#And likewise there were 11997 rows in the anti-join.
+#Thus, there were 11997 rows in the vdem dataset that weren't matched up with rows in the CO2 dataset
+#But a look at the joined dataset seems to indicate that the data match up correctly
+#And these NAs aren't an issue.
+#The anti-join seems to be just full of all nations before their emisions were recorded
+#E.g. pre-1945 or pre-1890 or something. All well before 1970 so this shouldn't matter.
+
+#vdemCarbon %>% View()
+vdemCarbonShort = vdemCarbon %>% 
+  select(country_name, year, v2x_polyarchy, v2xel_frefair, v2x_liberal, Annual.COâ...emissions) %>%
+  subset(year >= 1970)
+#head(vdemCarbonShort)
+#View(vdemCarbonShort)
+
+
+
+#Reproduce graphic from V-Dem working paper on climate change:
+#https://v-dem.net/media/publications/pb_31.pdf
+
+#Group by polyarchy >/< 0.5 (liberal democracy)
+
+
+
+
+
+
+
+
+vdemCarbonShortLess = vdemCarbonShort %>% subset(v2x_polyarchy < 0.5) %>% group_by(year) %>% mutate(
+  avEmissions = mean(Annual.COâ...emissions, na.rm = TRUE,
+                     ))
+#View(vdemCarbonShortLess)
+
+#plot(vdemCarbonShortLess$year, vdemCarbonShortLess$avEmissions)
+
+#View(vdemCarbonShortLess)
+vdemCarbonShortMore = vdemCarbonShort %>% subset(v2x_polyarchy >= 0.5) %>% group_by(year) %>% mutate(avEmissions = mean(Annual.COâ...emissions, na.rm = TRUE))
+#View(vdemCarbonShortMore)
+#View(vdemCarbonShortMore)
+
+#plot(vdemCarbonShortMore$year, vdemCarbonShortMore$avEmissions)
+library(ggplot2)
+?colnames
+
+```
+
+```{r}
+
+#The Loop
+for (i in 3:5)
+{
+#print(colnames(vdemCarbonShort[[i]]))
+vdemCarbonShortLess = vdemCarbonShort %>% subset(vdemCarbonShort[[i]] < 0.5) %>% group_by(year) %>% mutate(
+  avEmissions = mean(Annual.COâ...emissions, na.rm = TRUE),
+  totalEmissions = sum(Annual.COâ...emissions, na.rm = TRUE))
+#View(vdemCarbonShortLess)
+
+vdemCarbonShortMore = vdemCarbonShort %>% subset(vdemCarbonShort[[i]] >= 0.5) %>% group_by(year) %>% mutate(
+  avEmissions = mean(Annual.COâ...emissions, na.rm = TRUE),
+  totalEmissions = sum(Annual.COâ...emissions, na.rm = TRUE))
+View(vdemCarbonShortMore)
+
+#Plot in basic way
+#plot(vdemCarbonShortLess$year, vdemCarbonShortLess$avEmissions)
+#plot(vdemCarbonShortMore$year, vdemCarbonShortMore$avEmissions)
+
+#Plot 
+
+#Note: I used ggp = ggplot and print(ggp) because for some reason ggplot wasn't showing up
+#According to this website: https://ggplot2.tidyverse.org/reference/print.ggplot.html,
+#This is because you must explicitly print ggplot graphs when inside of a loop.
+
+#Also, note the format for the colnames function.
+#This is because colnames needs multiple columns, otherwise it returns null.
+#So you get the colnames for all of the columns and then select the ith column.
+
+#This plot uses data from two datasets.
+#In order to plot both on the same graph, do the following.
+#Here, I lucked out because x and y had the same names in both datasets
+#Not sure what to do otherwise.
+
+ggp <- ggplot(NULL, aes(year, avEmissions)) +    # Draw ggplot2 plot based on two data frames
+  geom_line(data = vdemCarbonShortLess, colour = "red") +
+  geom_line(data = vdemCarbonShortMore, colour = "blue") +
+  ylab("Average Emissions for Group") +
+  xlab("Year") + 
+  ggtitle(colnames(vdemCarbonShortLess)[i])
+print(ggp)
+
+}
+
+
+
+
+
+
+
+
+#Group by v2xel_frefair >/< 0.5 (free and fair elections)
+#Group by libcomp (v2x_liberal) >/< 0.5 (partial liberalism)
+
+#CarbonData %>% subset(Year > 1969) %>% 
+
+```
+
+
+
+
+```{r}
+#Mixed Indices
+
+
+#v2x_frassoc_thick:
+#Select all indicators for this index to isolate and examine them
+
+vdem2021_frassoc = vdem2021 %>% select(c("country_name", "year", "v2x_frassoc_thick", 
+                                       "v2psparban", "v2psbars", "v2psoppaut", "v2elmulpar",
+                                       "v2x_elecreg", "v2cseeorgs", "v2csreprss"))
+
+#View(vdem2021_frassoc)
+#View(vdem2021)
+
+#Why are there a bunch of negative values?
+#The scale for all of the indicators in frassoc_thick is supposed to be 0-4
+#Except v2x_elecreg which is 0/1 binary. 
+
+
+summary(vdem2021_frassoc$v2psparban)
+summary(vdem2021_frassoc$v2psbars)
+summary(vdem2021_frassoc$v2psoppaut)
+summary(vdem2021_frassoc$v2elmulpar)
+summary(vdem2021_frassoc$v2x_elecreg)
+summary(vdem2021_frassoc$v2cseeorgs)
+summary(vdem2021_frassoc$v2csreprss)
+
+#The codebook says it was "Ordinal, converted to interval by the measurement model."
+
+#What is "the measuremnet model"?
+
+#Note that for all of the important indices I'm using (but not elecoff), the scale
+#is interval 0-1. This is true for polyarchy, v2x_liberal, ffe, fra, suffr, and fxp. 
+#That's good. 
+
+#The issue is just figuring out how they aggregated up from the frassoc indicators
+#to the frassoc_thick index. Once I figure this out, then the rest should fall into place. 
+
+#Attempt #1: Let's assume the numbers were rescaled from 0 - 4 to -4 - 4
+#and then simply averaged together to get frassoc_thick. 
+#When elecreg = 1, the most recent value of v2elmulpar was used
+#When elecreg = 0, v2elmulpar was set to 0. 
+
+#Let's try it. 
+#Rescale -4 - 4 to 0 - 8 by adding 4 to all values of all variables.
+#Then, divide by 8 to get it all rescaled from 0-1
+attempt_1 = vdem2021_frassoc %>% mutate(v2psparban = (v2psparban + 4)/8,
+                                        v2psbars = (v2psbars + 4)/8,
+                                        v2psoppaut = (v2psoppaut + 4)/8,
+                                        v2elmulpar = (v2elmulpar + 4)/8,
+                                        v2x_elecreg = (v2x_elecreg + 4)/8,
+                                        v2cseeorgs = (v2cseeorgs + 4)/8,
+                                        v2csreprss = (v2csreprss + 4)/8)
+View(attempt_1)
+
+#Attempt 1 is incorrect. All of the numbers for the indicators are lower than frassoc_thick value.
+
+
+
+vdem_bad_check = vdem %>% select(c("country_name", "year", "v2x_frassoc_thick", 
+                                       "v2psparban", "v2psbars", "v2psoppaut", "v2elmulpar",
+                                       "v2x_elecreg", "v2cseeorgs", "v2csreprss")) %>% subset(v2x_elecreg == 0 & v2elmulpar != "NA")
+vdem_bad_check %>% View()
+
+#It looks like there are 7 instances where the v2x_elecreg variable is 0 but the v2elmulpar variable is not NA.
+#I'm going to assumet that these are errors, as these instances make no sense. 
+#How could there be no elections and yet the elections have a value on the multiparty scale?
+
+vdem_good_check = vdem %>% select(c("country_name", "year", "v2x_frassoc_thick", 
+                                       "v2psparban", "v2psbars", "v2psoppaut", "v2elmulpar",
+                                       "v2x_elecreg", "v2cseeorgs", "v2csreprss")) %>% subset(v2x_elecreg == 1)
+
+#vdem_good_check %>% View()
+
+vdem_ryan = vdem %>% select(c("country_name", "year", "v2x_frassoc_thick", 
+                                       "v2psparban", "v2psbars", "v2psoppaut", "v2elmulpar",
+                                       "v2x_elecreg", "v2cseeorgs", "v2csreprss"))
+
+vdem_ryan %>% View()
+
+
+#Here's how I understand it in terms of v2elmulpar and v2x_elecreg:
+#We should assume that the 7 instances above are errors and remove them
+#Then, whenever there is a 0 in the elecreg column, there will be an NA in the mulpar column.
+#Create a new variable called elec_mulpar, which is a combo of the two indicators. 
+
+
+#So what values should elec_mulpar take?
+#Current idea:
+# - When elecreg == 1, elec_mulpar = current or most recent non-NA value of mulpar
+# - When elecreg == 0, elec_mulpar = NA. 
+#And then throw elec_mulpar into the Bayesian Factor Analysis as one of the 6 variables,
+#Ignoring both elecreg and elmulpar.
+
+#Note the following text from the codebook: 
+#Note on frassoc aggregation:  
+
+#"Since the multiparty elections indicator is only
+#observed in election years, its values have first been repeated within election regime periods
+#as defined by v2x_elecreg."
+
+
+
+summary(vdem_ryan$v2x_frassoc_thick)
+
+
+
+#Let's try it!
+
+#p = 6 indicators
+#Count unique country names
+num_countries <- vdem_ryan %>%
+  distinct(country_name) %>%
+  n_distinct()
+
+# Print the number of unique countries
+print(num_countries)
+
+#p = 6 indicators
+#n = 202 countries
+
+
+
+#Let's just start with one year though to make it simple
+
+num_countries <- vdem2021_frassoc %>%
+  distinct(country_name) %>%
+  n_distinct()
+
+# Print the number of unique countries
+print(num_countries)
+
+
+#p = 6
+#n = 179
+#i = 1 observation per country in 2021
+#Note: I'm following Jackman 2009 (page 445) directly.
+#Analysis used by V-dem team is slighly different
+#but for this initial conversion I'm just trying to get close
+
+#The big question is how can they turn the interval numbers from their current format into 0-1?
+```
+
+
+model {
+  for(i in 1:n){ ## loop over observations
+    for(j in 1:5){## loop over indicators
+      mu[i,j] <- gamma[j,1] + gamma[j,2]*xi[i]                   
+      y[i,j] ~ dnorm(mu[i,j],tau[j])
+      }
+    }
+  
+  ## prior for latent variable
+  for(i in 1:n){
+    xistar[i] ~ dnorm(0,1)
+    xi[i] <- (xistar[i]-mean(xistar[]))/sd(xistar[])
+    }
+  
+  ## priors for the measurement parameters
+  for(j in 1:5){
+    
+    ## intercepts and slopes18              
+    gamma[j,1:2] ~ dmnorm(g0[1:2],G0[1:2,1:2])19
+    ## measurement error variances
+    tau[j] ~ dgamma(.01,.01)21              
+    omega[j] <- 1/sqrt(tau[j])
+  }
+}
+
+
+
+```{r}
+#Take a closer look at ELO:
+
+
+vdem2021_elo = vdem2021 %>% select(c("country_name", "year", "v2ex_elechos", 
+                                       "v2ex_elechog", "v2exdfcbhs_rec", "v2ex_hosw", "v2xex_elecleg",
+                                       "v2lgbicam", "v2lgello", "v2lgelecup", 
+                                     "v2lginello", "v2lginelup", "v2exaphos",
+                                       "v2expathhs", "v2exaphogp", "v2expathhg", 
+                                     "v2exdjcbhg", "v2exdfdmhs", "v2exdfdshg",
+                                       "v2exhoshog", "v2exapupap", "v2exapup"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+#Lame aggregation attempt:
+#DemScore = FFE, SUFFR, FRA (whole)
+#LibScore = FXP, v2x_liberal
+
+#See iPad for forumla:
+
+vdem_reagg = vdem %>% mutate(demReagg = 0.5*(v2xel_frefair * v2x_frassoc_thick * v2x_suffr) + 0.5*((2/5)*v2xel_frefair + (2/5)*v2x_frassoc_thick + (1/5)*v2x_suffr), 
+                             libReagg = 0.25*(v2x_freexp_altinf^1.585) + 0.25*v2x_liberal + 0.5*((v2x_freexp_altinf^1.585)*v2x_liberal),
+                             demRmin = 0.5*(v2xel_frefair * v2x_suffr) + 0.5*((2/3)*v2xel_frefair + (1/3)*v2x_suffr))
+
+vdem_reagg = vdem_reagg %>% select(country_name, year, v2x_polyarchy, v2x_liberal, v2xel_frefair, v2x_frassoc_thick, v2x_suffr, v2x_freexp_altinf, demReagg, libReagg, demRmin)
+
+#vdem_reagg %>% View()
+
+
+
+#Plot and sample data to ensure it looks okay
+
+sampled_data <- vdem_reagg %>%
+  sample_n(100, replace = FALSE)
+
+#Check libReagg vs. v2x_liberal
+ggplot(data = sampled_data, aes(x = v2x_liberal, y = libReagg, label = country_name)) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE) +
+  geom_text(nudge_y = 0.2)
+
+
+
+
+#Looks good except there's a bit of a J shape. 
+#This is because the line is dragged down by instances where there is no free speech. 
+#I would argue that this might be justified, since free speech is a very basic liberal right
+#And perhaps deserves to be weighted heavily.
+
+
+#Big Question: How do we translate v2x_liberal into libReagg?
+#E.g. for the cutoff of v2x_liberal > 0.8, what should the cutoff for libReagg be?
+#Problem: It's not linear
+#We only are interested in the libReagg scores of the regimes with around 0.8 v2x_liberal score
+#Idea: Look at the regimes around the cutoff point for a year (e.g. 2021) and see what their libReagg score is
+#Potential Problem: These regimes might have wildly different scores than the ones that existed in 1840. 
+#Let's see: 
+
+
+#After viewing the discrepancy in the scores for 25 countries near 0.80 in 2021
+#It appears that their libReagg scores are on average 11 points lower than their v2x_liberal scores
+#Round to 10, so set the cutpoint at 0.70 for libReagg - distinction between liberal and non-liberal regimes. 
+#Median drop looks similar to mean drop, off of eyeballing it.
+
+
+
+
+#Check polyarchy vs. demReagg
+ggplot(data = sampled_data, aes(x = v2x_polyarchy, y = demReagg, label = country_name)) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE) +
+  geom_text(nudge_y = 0.2)
+#That's a very good fit
+
+
+#Check Boix vs. demReagg
+
+#Nvm, Boix not in this dataset. 
+
+
+```
+
+
+
+```{r}
+#Do some analysis with the lame reaggregated indices
+
+
+#Plot average of each reaggregated index over time
+
+#The results show that the democracy index seems to be declining
+#Could this be due to the inclusion of the freedom of association index?
+#Examine results without frassoc_thick too
+#Use demRmin, a different reaggregated democracy index that only includes suffr and ffe:
+
+avyear_reagg = vdem_reagg %>% group_by(year) %>% summarize(
+  avgDEMOC = mean(demReagg, na.rm = TRUE), 
+  avgLIBER =  mean(libReagg, na.rm = TRUE),
+  avgDMIN = mean(demRmin, na.rm = TRUE))
+
+#avyear_reagg %>% View()
+
+
+ggplot(avyear_reagg, aes(year)) + 
+  geom_line(aes(y = avgDEMOC, colour = "Democracy")) +   
+  geom_line(aes(y = avgLIBER, colour = "Constitutional Liberalism")) +
+    #geom_line(aes(y = avgDMIN, colour = "avgDMIN")) +
+              xlim(1900,2021) +
+  #These lines are based on Huntington's two waves (more acccepted definition?)
+  #2012 is an estimate for maximum
+  #Luhrmann and Lindberg's is slightly different: 1926-1942, '61-'77, '94-on
+  #geom_vline(xintercept = 1922, color = "cyan", linetype = "solid", size = 0.5) +
+  #geom_vline(xintercept = 1942, color = "cyan", linetype = "solid", size = 0.5) +
+  #geom_vline(xintercept = 1960, color = "purple", linetype = "solid", size = 0.5) +
+  #geom_vline(xintercept = 1975, color = "purple", linetype = "solid", size = 0.5) +
+    geom_vline(xintercept = 2011, color = "cyan", linetype = "solid", size = 0.5) +
+              ylim(0,1) + xlab("Year") + ylab("Mean Reaggregated Index Score") + 
+  ggtitle("Global Average V-Dem Reaggregated Index Score Over Time")
+
+
+#Look at each wave:
+#Note: Dates are slightly different than Huntington's b/c these are my indices:
+
+#First wave: 
+ggplot(avyear_reagg, aes(year)) + 
+  geom_line(aes(y = avgDEMOC, colour = "avgDEMOC")) +   
+  geom_line(aes(y = avgLIBER, colour = "avgLIBER")) +
+              xlim(1920,1945) +
+              ylim(0.1,0.3) + xlab("Year") + ylab("Mean Reaggregated Index Score") + 
+  ggtitle("Global Average Scores over Time - First Wave")
+
+ggplot(avyear_reagg, aes(year)) + 
+  geom_line(aes(y = avgDEMOC, colour = "avgDEMOC")) +   
+  geom_line(aes(y = avgLIBER, colour = "avgLIBER")) +
+              xlim(1963,1975) +
+              ylim(0.25,0.35) + xlab("Year") + ylab("Mean Reaggregated Index Score") + 
+  ggtitle("Global Average Scores over Time - Second Wave")
+
+ggplot(avyear_reagg, aes(year)) + 
+  geom_line(aes(y = avgDEMOC, colour = "avgDEMOC")) +   
+  geom_line(aes(y = avgLIBER, colour = "avgLIBER")) +
+              xlim(2011,2021) +
+              ylim(0.45, 0.60) + xlab("Year") + ylab("Mean Reaggregated Index Score") + 
+  ggtitle("Global Average Scores over Time - Third Wave")
+
+
+#By how much have the two declined from their peaks?
+
+diffDEMOC = avyear_reagg[avyear_reagg$year == 2021, "avgDEMOC"] - max(avyear_reagg$avgDEMOC, na.rm = TRUE)
+diffDEMOC
+#-0.0228318
+
+diffLIBER = avyear_reagg[avyear_reagg$year == 2021, "avgLIBER"] - max(avyear_reagg$avgLIBER, na.rm = TRUE)
+diffLIBER
+#-0.04583171
+
+max(avyear_reagg$avgLIBER, na.rm = TRUE)
+max(avyear_reagg$avgDEMOC, na.rm = TRUE)
+
+
+
+
+#How crazy are these declines, looking at historical data?
+
+#Examine other eras where democracy and liberalism declined
+diff_values_dem <- diff(avyear_reagg$avgDEMOC)
+decline_periods_dem <- which(diff_values_dem < 0)
+decline_years_dem <- avyear_reagg$year[decline_periods_dem]
+
+#Select only the years after 1900
+dec_y_dem <- decline_years_dem[decline_years_dem > 1900]
+dec_y_dem
+
+
+diff_values_lib <- diff(avyear_reagg$avgLIBER)
+decline_periods_lib <- which(diff_values_lib < 0)
+decline_years_lib <- avyear_reagg$year[decline_periods_lib]
+
+#Select only the years after 1900
+dec_y_lib <- decline_years_lib[decline_years_lib > 1900]
+dec_y_lib
+
+#Periods of democratic decline (after 1900): 
+#1902-1903, 1913-1914, 1924-1927, 1929-1930, 1932-1934, 1936, 1938-1943, 1964-1966, 1968-1973, 1975, 1980, 1998-1999, 2006, 2009, 2012-2014, 2016-2020
+
+#Simplified, allowing for one-year gaps: #1902-1903, 1913-1914, 1924-1943, 1964-1975, 1980, 1998-1999, 2006, 2009, 2012-2020
+
+#Simplified further, cutting out one, two, or three year blips: 1924-1943, 1964-1975, 2012-2020
+
+#Add end year (1943 means that it declined from 1943 to 1944): 1924-1944, 1964-1976, 2012-2021
+
+
+
+#Periods of liberal decline (after 1900): 1901-1903, 1909-1915, 1921-1930, 1932-1943, 1947, 1952, 1963-1968, 1970-1972, 1981, 2006, 2012-2020
+
+#Simplified, allowing for one-year gaps: 1901-1903, 1909-1915, 1921-1943, 1947, 1952, 1963-1972, 1981, 2006, 2012-2020
+
+#Simplified, cutting out one, two, or three year blips: 1909-1915, 1921-1943, 1963-1972, 2012-2020
+
+#Adding end year: 1909-1916, 1921-1944, 1963-1973, 2012-2021
+
+
+#Lining them up: 
+#Eras of democratic backsliding: 1924-1944, 1964-1976, 2012-2021
+#Eras of liberal backsliding: 1909-1916, 1921-1944, 1963-1973, 2012-2021
+
+```
+
+```{r}
+#Have the two separated over time?
+
+
+#Plot demReagg vs. libReagg for every decade from 1980 to present
+#Label countries, and include regression line with R-squared (R2) value.
+
+#Main idea: See if the two strands are separating
+
+
+#Cutpoint for v2x_liberal is 0.80
+#Cutpoint for libReagg is 0.70
+
+perform_analysis <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(AD == year)
+  
+  plot(demReagg ~ libReagg, col = "lightblue", pch = 19, cex = 2, xlim = c(0, 1), ylim = c(0, 1), data = vdem_reagg_year)
+    abline(h = 0.5, col = "black")
+  abline(v = 0.8, col = "black")
+  abline(0, 1, col = "black", lwd = 3)
+  rect(xleft = 0, xright = 0.8, ybottom = 0, ytop = 0.5, 
+  border = NA, col = adjustcolor("orange", alpha = 0.3))
+  rect(xleft = 0.8, xright = 1, ybottom = 0, ytop = 0.5, 
+  border = NA, col = adjustcolor("darkorange3", alpha = 0.3))
+  rect(xleft = 0, xright = 0.8, ybottom = 0.5, ytop = 1, 
+  border = NA, col = adjustcolor("lightblue", alpha = 0.3))
+  rect(xleft = 0.8, xright = 1, ybottom = 0.5, ytop = 1, 
+  border = NA, col = adjustcolor("dodgerblue", alpha = 0.3))
+  abline(lm(demReagg ~ libReagg, data = vdem_reagg_year), col = "red", lwd = 3)
+  legend("topleft", legend = paste("R2 is", format(summary(lm(demReagg ~ libReagg, data = vdem_reagg_year))$r.squared, digits = 3)))
+  text(demReagg ~ libReagg, labels = country_name, data = vdem_reagg_year, cex = 0.9, font = 0.5, pos = 4)
+  title(main = paste("Year:", vdem_reagg_year$year[1]))
+  
+  
+  return(summary(lm(demReagg ~ libReagg, data = vdem_reagg_year))$r.squared)
+}
+
+# Usage example
+perform_analysis(vdem_reagg, 1900)
+perform_analysis(vdem_reagg, 1910)
+perform_analysis(vdem_reagg, 1920)
+perform_analysis(vdem_reagg, 1930)
+perform_analysis(vdem_reagg, 1940)
+perform_analysis(vdem_reagg, 1950)
+perform_analysis(vdem_reagg, 1960)
+perform_analysis(vdem_reagg, 1970)
+perform_analysis(vdem_reagg, 1980)
+perform_analysis(vdem_reagg, 1990)
+perform_analysis(vdem_reagg, 2000)
+perform_analysis(vdem_reagg, 2010)
+perform_analysis(vdem_reagg, 2021)
+perform_analysis(vdem_reagg, 1840)
+
+```
+
+
+
+#Try with original indicies
+```{r}
+
+perform_analysis2 <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(AD == year)
+  
+  plot(v2x_polyarchy ~ v2x_liberal, col = "lightblue", pch = 19, cex = 2, xlim = c(0, 1), ylim = c(0, 1), data = vdem_reagg_year)
+  abline(h = 0.5, col = "black")
+  abline(v = 0.8, col = "black")
+  abline(0, 1, col = "black", lwd = 3)
+  rect(xleft = 0, xright = 0.8, ybottom = 0, ytop = 0.5, 
+  border = NA, col = adjustcolor("orange", alpha = 0.3))
+  rect(xleft = 0.8, xright = 1, ybottom = 0, ytop = 0.5, 
+  border = NA, col = adjustcolor("darkorange3", alpha = 0.3))
+  rect(xleft = 0, xright = 0.8, ybottom = 0.5, ytop = 1, 
+  border = NA, col = adjustcolor("lightblue", alpha = 0.3))
+  rect(xleft = 0.8, xright = 1, ybottom = 0.5, ytop = 1, 
+  border = NA, col = adjustcolor("dodgerblue", alpha = 0.3))
+  #abline(lm(v2x_polyarchy ~ v2x_liberal, data = vdem_reagg_year), col = "red", lwd = 3)
+  legend("topleft", legend = paste("R2 is", format(summary(lm(v2x_polyarchy ~ v2x_liberal, data = vdem_reagg_year))$r.squared, digits = 3)))
+  #text(v2x_polyarchy ~ v2x_liberal, labels = country_name, data = vdem_reagg_year, cex = 0.9, font = 0.1, pos = 4)
+  title(main = paste("Year:", vdem_reagg_year$year[1]))
+  
+  
+  return(summary(lm(v2x_polyarchy ~ v2x_liberal, data = vdem_reagg_year))$r.squared)
+}
+
+#Examples
+
+perform_analysis2(vdem_reagg, 1840)
+perform_analysis2(vdem_reagg, 1990)
+perform_analysis2(vdem_reagg, 2000)
+perform_analysis2(vdem_reagg, 2005)
+perform_analysis2(vdem_reagg, 2010)
+perform_analysis2(vdem_reagg, 2021)
+
+
+
+```
+
+```{r}
+#Try the same thing using ggplot2
+
+# Load required libraries
+#install.packages("ggrepel")
+
+library(ggplot2)
+library(ggrepel)
+
+# Assuming vdem_reagg_year is your dataframe
+
+
+perform_analysis3 <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(AD == year)
+
+  # Create the scatterplot using ggplot2
+  p <- ggplot(vdem_reagg_year, aes(x = v2x_liberal, y = v2x_polyarchy)) +
+    geom_rect(aes(xmin = 0, xmax = 0.8, ymin = 0, ymax = 0.5),
+              fill = "orange", alpha = 0.3) +
+    geom_rect(aes(xmin = 0.8, xmax = 1, ymin = 0, ymax = 0.5),
+              fill = "darkorange3", alpha = 0.3) +
+    geom_rect(aes(xmin = 0, xmax = 0.8, ymin = 0.5, ymax = 1),
+              fill = "lightblue", alpha = 0.3) +
+    geom_rect(aes(xmin = 0.8, xmax = 1, ymin = 0.5, ymax = 1),
+              fill = "dodgerblue", alpha = 0.3) +
+    # Create a segment representing the line from (0,0) to (1,1)
+    geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1),
+              col = "gray50", size = 1) + 
+    #geom_abline(aes(intercept = 0, slope = -1), col = "black",
+    #            data = data.frame(x = c(0.8, 1), y = c(0, 0.5))) +
+    #geom_abline(aes(intercept = 0.5, slope = 0), col = "black",
+    #            data = data.frame(x = c(0, 1), y = c(0, 1)), size = 3) +
+    geom_point(aes(colour = "purple"), pch = 19, size = 2) +
+    #geom_smooth(method = "lm", formula = y ~ x, color = "red", size = 3, se = FALSE) +
+    theme_minimal() +
+    theme(legend.position = "topleft") +
+    geom_text_repel(aes(label = country_name), size = 0.9, fontface = 1,
+                    position = position_jitter(seed = 123), segment.color = NA) +
+    labs(title = paste("Countries Plotted in 2-D Space for Year:", AD)) + 
+    xlab("Liberalism Score (v2x_liberal)") +
+    ylab("Democracy Score (v2x_polyarchy)")
+
+  print(p)
+
+  return(summary(lm(v2x_polyarchy ~ v2x_liberal, data = vdem_reagg_year))$r.squared)
+}
+
+# Examples
+perform_analysis3(vdem_reagg, 1840)
+perform_analysis3(vdem_reagg, 1990)
+perform_analysis3(vdem_reagg, 2000)
+perform_analysis3(vdem_reagg, 2005)
+perform_analysis3(vdem_reagg, 2010)
+perform_analysis3(vdem_reagg, 2021)
+
+
+
+
+
+
+
+
+perform_analysis5 <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(AD == year)
+
+  # Create the scatterplot using ggplot2
+  p <- ggplot(vdem_reagg_year, aes(x = libReagg, y = demReagg)) +
+    geom_rect(aes(xmin = 0, xmax = 0.7, ymin = 0, ymax = 0.5),
+              fill = "orange", alpha = 0.3) +
+    geom_rect(aes(xmin = 0.7, xmax = 1, ymin = 0, ymax = 0.5),
+              fill = "darkorange3", alpha = 0.3) +
+    geom_rect(aes(xmin = 0, xmax = 0.7, ymin = 0.5, ymax = 1),
+              fill = "lightblue", alpha = 0.3) +
+    geom_rect(aes(xmin = 0.7, xmax = 1, ymin = 0.5, ymax = 1),
+              fill = "dodgerblue", alpha = 0.3) +
+    # Create a segment representing the line from (0,0) to (1,1)
+    geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1),
+              col = "gray50", size = 1) + 
+    #geom_abline(aes(intercept = 0, slope = -1), col = "black",
+    #            data = data.frame(x = c(0.8, 1), y = c(0, 0.5))) +
+    #geom_abline(aes(intercept = 0.5, slope = 0), col = "black",
+    #            data = data.frame(x = c(0, 1), y = c(0, 1)), size = 3) +
+    geom_point(aes(colour = "purple"), pch = 19, size = 2) +
+    #geom_smooth(method = "lm", formula = y ~ x, color = "red", size = 3, se = FALSE) +
+    theme_minimal() +
+    theme(legend.position = "topleft") +
+    geom_text_repel(aes(label = country_name), size = 0.9, fontface = 1,
+                    position = position_jitter(seed = 123), segment.color = NA) +
+    labs(title = paste("Countries Plotted in 2-D Space for Year:", AD)) + 
+    xlab("Liberalism Score (libReagg)") +
+    ylab("Democracy Score (demReagg)")
+
+  print(p)
+
+  return(summary(lm(demReagg ~ libReagg, data = vdem_reagg_year))$r.squared)
+}
+
+# Examples
+perform_analysis5(vdem_reagg, 1810)
+perform_analysis5(vdem_reagg, 1820)
+perform_analysis5(vdem_reagg, 1830)
+perform_analysis5(vdem_reagg, 1840)
+perform_analysis5(vdem_reagg, 1850)
+perform_analysis5(vdem_reagg, 1860)
+perform_analysis5(vdem_reagg, 1870)
+perform_analysis5(vdem_reagg, 2021)
+perform_analysis5(vdem_reagg, 1970)
+perform_analysis5(vdem_reagg, 2000)
+perform_analysis5(vdem_reagg, 2010)
+
+
+
+
+
+
+
+
+```
+
+```{r}
+#Graph for 2021
+#Quadrant divisions at 0.5
+#BIG QUESTION: WHERE SHOULD THE QUADRANT DIVISIONS BE?
+# - Not at mean, because this makes it dependent on observed data
+# - Probably not at 0.5 for liberalism, b/c I would imagine that V-dem only classifies liberal democracies as such if libscore is very high. Need to see how they define it.
+
+
+#For Democracy, the cutoff should be 0.5, because this is what Vdem set it at (for polyarchy)
+#For Liberalism, 
+
+
+
+#Create a modified function
+#This does the following for the specified year:
+# - Plots countries by their liberalism and democracy score
+# - Divides the plot into quadrants (currently at (0.5, 0.5), but we need to change this)
+# - Counts the number of countries in the Liberal Autocracy and Illiberal Democracy Quadrants.
+# - Labels the countries in the Liberal Autocracy and Illiberal Democracy Quadrants.
+# - Returns number of Liberal Autocracies and Illiberal Democracies.
+
+
+plot_quad_names <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(year == AD)
+  
+  plot(demReagg ~ libReagg, col = "lightblue", pch = 19, cex = 2, data = vdem_reagg_year)
+  divider_lib <- 0.5
+  divider_dem <- 0.5
+  abline(h = divider_dem, col = "red", lwd = 2)
+  abline(v = divider_dem, col = "red", lwd = 2)
+  title(main = paste("Countries Plotted by Liberalism and Democracy Score, Year:", AD))
+  
+  #Create counters for liberal autocracies and illiberal democracies
+  #These are regimes that fall in the 2nd and 4th quadrants
+  libAuto <- 0
+  illibDem <- 0 
+  
+  # Label points in the 2nd and 4th quadrants with their country names
+  for (i in 1:length(vdem_reagg_year$country_name)) {
+    if (!is.na(vdem_reagg_year$libReagg[i]) & !is.na(vdem_reagg_year$demReagg[i])) {
+      if (vdem_reagg_year$libReagg[i] < divider_lib & vdem_reagg_year$demReagg[i] > divider_dem) {
+        text(vdem_reagg_year$libReagg[i], vdem_reagg_year$demReagg[i], labels = vdem_reagg_year$country_name[i], cex = 0.9, font = 0.5, pos = 4)
+        illibDem <- illibDem + 1
+      } else if (vdem_reagg_year$libReagg[i] > divider_lib & vdem_reagg_year$demReagg[i] < divider_dem) {
+        text(vdem_reagg_year$libReagg[i], vdem_reagg_year$demReagg[i], labels = vdem_reagg_year$country_name[i], cex = 0.9, font = 0.5, pos = 4)
+        libAuto <- libAuto + 1
+      }
+    }
+  }
+  
+  legend("topleft", legend = paste(c("Liberal Autocracies: ", "Illiberal Democracies: "), format(c(libAuto, illibDem))))
+  
+  return(c(libAuto, illibDem))
+}
+
+
+
+plot_quad_names(vdem_reagg, 2021)
+
+
+
+
+
+
+
+
+
+
+#This would be perfect as a Hans Rosling plot, with a new plot each year and a circle size corresponding to quality of governance (e.g. Human Development Index) or population
+
+#Next steps:
+# - Figure out what cutoff to use for dem/auto and lib/illib
+# - Upload this code to github to back it up.
+
+
+
+
+
+
+
+```
+
+
+
+```{r}
+
+
+
+#Animate this plot like Hans Rosling:
+
+#First try it with only the current liberal democracies, to see what their historic trajectory was
+
+#Still assuming cutpoints at 0.5 and 0.7
+cut_dem = 0.5
+cut_lib = 0.7
+
+#install.packages("gganimate")
+#install.packages("animation")
+library(animation)
+library(ggplot2)
+library(gganimate)
+library(magick)
+
+plot_quad_animation <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c("Australia", "Barbados", "Belgium", "Bhutan", "Botswana", "Canada", "Chile", "Costa Rica", "Cyprus", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Iceland", "Ireland", "Israel", "Italy", "Japan", "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "United States of America")
+  data_filtered <- data %>% filter(country_name %in% selected_countries & !is.na(libReagg) & !is.na(demReagg))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = libReagg, y = demReagg, label = country_name)) +
+    geom_point(color = "lightblue", size = 3, show.legend = FALSE) +
+     geom_text(aes(label = country_name), vjust = 1, hjust = 1, size = 3) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = cut_dem, color = "green", linetype = "dashed") +
+    geom_vline(xintercept = cut_lib, color = "green", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("") +
+    transition_states(year, transition_length = 0.5, state_length = 0) +
+    enter_fade() +
+    exit_fade() +
+    view_follow(fixed_y = TRUE) +
+    ease_aes('linear') +
+    labs(title = "Year: {round(range(data_filtered$year)[1] + (range(data_filtered$year)[2] - range(data_filtered$year)[1]) * (frame / nframes))}")
+  
+  # Animate the plot
+  anim <- animate(p, nframes = length(unique(data_filtered$year)), fps = 5)
+  
+  return(anim)
+}
+
+# Let it run
+animation_current <- plot_quad_animation(vdem_reagg)
+animation_current
+
+
+```
+
+
+
+```{r}
+
+
+
+#Do it again with v2x_polyarchy and v2x_liberal
+#See if it is different
+
+#First try it with only the current liberal democracies, to see what their historic trajectory was
+
+#Still assuming cutpoints at 0.5 and 0.8
+cut_dem = 0.5
+cut_lib = 0.8
+
+#install.packages("gganimate")
+#install.packages("animation")
+library(animation)
+library(ggplot2)
+library(gganimate)
+library(magick)
+
+plot_poly <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  
+  #Verify that these are current liberal democracies and not one-time liberal autocracies. What happened to Canada, Austria? Also United States of America instead of USA?
+  selected_countries <- c("Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "USA")
+  data_filtered <- data %>% filter(country_name %in% selected_countries & !is.na(v2x_polyarchy) & !is.na(v2x_liberal))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, label = country_name)) +
+    geom_point(color = "lightblue", size = 3, show.legend = FALSE) +
+     geom_text(aes(label = country_name), vjust = 1, hjust = 1, size = 3) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = cut_dem, color = "green", linetype = "dashed") +
+    geom_vline(xintercept = cut_lib, color = "green", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("") +
+    transition_states(year, transition_length = 0.5, state_length = 0) +
+    enter_fade() +
+    exit_fade() +
+    view_follow(fixed_y = TRUE) +
+    ease_aes('linear') +
+    labs(title = "Year: {round(range(data_filtered$year)[1] + (range(data_filtered$year)[2] - range(data_filtered$year)[1]) * (frame / nframes))}")
+  
+  # Animate the plot
+  anim <- animate(p, nframes = length(unique(data_filtered$year)), fps = 5)
+  
+  return(anim)
+}
+
+# Let it run
+animation_poly <- plot_poly(vdem_reagg)
+animation_poly
+
+
+```
+
+
+
+
+
+
+```{r}
+
+#Now look at the trajectory of every other regimes
+
+#Still assuming cutpoints at 0.5 and 0.8
+cut_dem = 0.5
+cut_lib = 0.8
+
+#install.packages("gganimate")
+#install.packages("animation")
+library(animation)
+library(ggplot2)
+library(gganimate)
+library(magick)
+
+plot_poly_others <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c("Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "USA", "United States of America")
+  data_filtered <- data %>% filter(!(country_name %in% selected_countries) & !is.na(v2x_polyarchy) & !is.na(v2x_liberal))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, label = country_name)) +
+    geom_point(color = "lightblue", size = 3, show.legend = FALSE) +
+     geom_text(aes(label = country_name), vjust = 1, hjust = 1, size = 3) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = cut_dem, color = "green", linetype = "dashed") +
+    geom_vline(xintercept = cut_lib, color = "green", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("") +
+    transition_states(year, transition_length = 0.5, state_length = 0) +
+    enter_fade() +
+    exit_fade() +
+    view_follow(fixed_y = TRUE) +
+    ease_aes('linear') +
+    labs(title = "Year: {round(range(data_filtered$year)[1] + (range(data_filtered$year)[2] - range(data_filtered$year)[1]) * (frame / nframes))}")
+  
+  # Animate the plot
+  anim <- animate(p, nframes = length(unique(data_filtered$year)), fps = 5)
+  
+  return(anim)
+}
+
+# Let it run
+animation_poly_others <- plot_poly_others(vdem_reagg)
+animation_poly_others
+
+
+```
+
+
+
+
+```{r}
+#Same thing but for all countries:
+
+plot_all <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c("Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "USA")
+  data_filtered <- data %>% filter(country_name %in% selected_countries & !is.na(libReagg) & !is.na(demReagg))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = libReagg, y = demReagg, label = country_name)) +
+    geom_point(color = "lightblue", size = 3, show.legend = FALSE) +
+     geom_text(aes(label = country_name), vjust = 1, hjust = 1, size = 3) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = cut_dem, color = "green", linetype = "dashed") +
+    geom_vline(xintercept = cut_lib, color = "green", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("") +
+    transition_states(year, transition_length = 0.5, state_length = 0) +
+    enter_fade() +
+    exit_fade() +
+    view_follow(fixed_y = TRUE) +
+    ease_aes('linear') +
+    labs(title = "Year: {round(range(data_filtered$year)[1] + (range(data_filtered$year)[2] - range(data_filtered$year)[1]) * (frame / nframes))}")
+  
+  # Animate the plot
+  anim <- animate(p, nframes = length(unique(data_filtered$year)), fps = 5)
+  
+  return(anim)
+}
+
+# Let it run
+animation_all <- plot_all(vdem_reagg)
+animation_all
+
+
+```
+
+
+
+```{r}
+#Do the same thing as above, but plot lines showing the progress of each country.
+#Again, first limit it to only successful cases:
+
+library(ggplot2)
+
+vdem_reagg %>% View()
+
+plot_progress <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", 
+    "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", 
+    "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", 
+    "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "USA"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(libReagg) & !is.na(demReagg)) & (year > 1945))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = libReagg, y = demReagg, group = country_name, color = country_name)) +
+    geom_line(size = 0.8) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Countries' Progress Over Time")
+  
+  return(p)
+}
+
+# Usage example
+plot_progress(vdem_reagg)
+
+```
+
+
+```{r}
+
+#Using Original indices:
+
+#Successful countries
+plot_progress_poly <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", 
+    "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", 
+    "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", 
+    "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "United States of America"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(v2x_liberal) & !is.na(v2x_polyarchy)) & (year < 2022))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, group = country_name, color = country_name)) +
+    geom_line(size = 0.4) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Current Liberal Democracies)")
+  
+  return(p)
+}
+
+# Usage example
+plot_progress_poly(vdem_reagg)
+
+
+
+
+
+
+#Which regimes have experienced backsliding / failed in their democratization?
+
+#Idea 1: Regimes which were once liberal democracies but are no longer
+#Idea 2: Regimes that were once democracies but no longer
+#Idea 3: All countries other than the ones that are currently liberal democracies
+#Idea 4: Regimes that were downgraded to EDs in 2023
+#Idea 5: Regimes that were downgraded to EAs in 2023
+
+
+
+#Idea 1: / Idea 3:
+
+#Select all countries that were at one point liberal democracies:
+
+library(dplyr)
+
+library(dplyr)
+library(ggplot2)
+
+plot_progress_failed <- function(data) {
+  
+  current_libdem <- c(
+    "Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", 
+    "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", 
+    "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", 
+    "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "United States of America"
+  )
+  
+  # Filter out missing values
+  data_filtered <- data %>% 
+    filter(!is.na(v2x_liberal) & !is.na(v2x_polyarchy) & (year < 2022))
+  
+  # Select countries that were once liberal democracies but no longer are
+  selected_countries <- data_filtered %>%
+    group_by(country_name) %>%
+    filter(any(v2x_liberal > 0.8 & v2x_polyarchy > 0.5) & all(!(country_name %in% current_libdem)))
+  
+  # Create a ggplot object
+  p <- ggplot(selected_countries, aes(x = v2x_liberal, y = v2x_polyarchy, group = country_name, color = country_name)) +
+    geom_line(size = 0.4) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Failed Liberal Democracies)") + 
+    guides(color = FALSE)
+  
+  return(p)
+}
+
+# Usage example
+plot_progress_failed(vdem_reagg)
+
+
+
+
+plot_progress_non <- function(data) {
+  
+  current_libdem <- c(
+    "Australia", "Barbados", "Belgium", "Chile", "Costa Rica", "Cyprus", "Czech Republic", "Denmark", 
+    "Estonia", "Finland", "France", "Germany", "Iceland", "Ireland", "Israel", "Italy", "Japan", 
+    "Latvia", "Luxembourg", "Netherlands", "New Zealand", "Norway", "Seychelles", "Slovakia", 
+    "South Korea", "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", "Uruguay", "United States of America"
+  )
+  
+  # Filter out missing values
+  data_filtered <- data %>% 
+    filter(!is.na(v2x_liberal) & !is.na(v2x_polyarchy) & (year < 2022))
+  
+  # Select countries that were once liberal democracies but no longer are
+  selected_countries <- data_filtered %>%
+    group_by(country_name) %>%
+    filter(all(!(country_name %in% current_libdem)))
+  
+  # Create a ggplot object
+  p <- ggplot(selected_countries, aes(x = v2x_liberal, y = v2x_polyarchy, group = country_name, color = country_name)) +
+    geom_line(size = 0.4) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Is Not Liberal Democracy)") + 
+    guides(color = FALSE)
+  
+  return(p)
+}
+
+# Usage example
+plot_progress_non(vdem_reagg)
+
+
+```
+
+
+
+
+```{r}
+#Plot the backsliding of the countries which have downgraded from libdem to ED between 2011 and 2021:
+#Look at their rise (before 2011)
+
+plot_libdem_to_ed <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Austria", "Czech Republic", "Ghana", "Lithuania", "Mauritius", "Poland", "Portugal", "Slovakia", "Slovenia", "South Africa", "Trinidad and Tobago"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(v2x_liberal) & !is.na(v2x_polyarchy)) & (year < 2011))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, group = country_name, color = country_name)) +
+    geom_line(size = 0.9) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Current ED, former LD)")
+  
+  return(p)
+}
+
+# Usage example
+plot_libdem_to_ed(vdem_reagg)
+
+
+
+
+
+
+#ED to EA
+plot_ed_to_ea <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Albania", "Benin", "El Salvador", "Hungary", "India", "Lebanon", "Montenegro", "Philippines", "Turkey", "Serbia", "Zambia"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(v2x_liberal) & !is.na(v2x_polyarchy)) & (year < 2011))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, group = country_name, color = country_name)) +
+    geom_line(size = 0.9) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Current EA, Former ED)")
+  
+  return(p)
+}
+
+# Usage example
+plot_ed_to_ea(vdem_reagg)
+
+
+
+
+
+
+```
+
+
+```{r}
+
+#African countires
+plot_africa <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Angola", "Rwanda", "Burundi", "Nigeria", "Somalia", "Eritrea", "Senegal", "Namibia"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(libReagg) & !is.na(demReagg)))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = libReagg, y = demReagg, group = country_name, color = country_name)) +
+    geom_line(size = 0.8) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Countries' Progress Over Time")
+  
+  return(p)
+}
+
+# Usage example
+plot_africa(vdem_reagg)
+
+
+
+#Jacob's idea:
+#Use maximum historical level of democracy for each country
+#Plot results
+
+
+
+
+
+```
+
+
+```{r}
+#Do some regression analysis:
+
+#Idea 1: 
+#Cut sample to include only states which were at one point liberal democracies
+#Selection on dependent variable?
+#IV: Ratio of liberalism to democracy just before first entry into liberal democracy quadrant
+#This is a proxy for whether they focused on democracy or liberalism first
+#DV: Did the liberal democracy fail? (Are they still a liberal democracy?)
+#This is a proxy for whether backsliding occurred or not.
+
+#Alternative IV: Slope of line during first entry into liberal democracy quadrant
+#Alternative IV: Slope of line during last entry into liberal democracy quadrant
+#Alternative IV: Liberalism score when first became a democracy (crossed dem > 0.5)
+
+
+
+#Idea 2: 
+#Sample: All countries that were once democracies
+#IV: Liberalism score when they became democracies
+#DV: Are they still a democracy? (Binary)
+#Better DV: How much has their democracy score declined from it's peak?
+#(a better measure of how much backsliding it has sustained)
+
+# Subset the data to include only countries that were at one point democracies
+#This selects only the time that they were democracies
+dem_countries <- vdem_reagg %>% filter((v2x_polyarchy > 0.5))
+
+# Find the earliest year of democratization for each country
+earliest_dem_year <- dem_countries %>% 
+  group_by(country_name) %>%
+  summarize(earliest_year = min(year))
+
+#Calculate the prior year
+earliest_dem_year = earliest_dem_year %>% mutate(prior_year = earliest_year - 1)
+
+earliest_dem_year %>% View()
+
+
+#Also calculate max democracy score for each country that was once a democracy
+max_point_dem_vdem = dem_countries %>% group_by(country_name) %>%
+  summarize(max_polyarchy_score = max(v2x_polyarchy),
+            max_demReagg_score = max(demReagg))
+
+#max_point_dem_vdem %>% View()
+
+#Get 2021 scores for each country
+vdem_reagg_2021 = vdem_reagg %>% subset(year == 2021)
+
+#vdem_reagg_2021 %>% View()
+
+#Clean it:
+#For now we are only interested in the polyarchy score in 2021
+#Remove all columns from the 2021 dataset except polyarchy score. 
+#Rename polyarchy score to polyarchy_2021
+#Also add in demReagg for good measure
+
+vdem_reagg_2021_clean = vdem_reagg_2021 %>% 
+  mutate(polyarchy_2021 = v2x_polyarchy, 
+         demReagg_2021 = demReagg) %>% 
+  select(country_name, polyarchy_2021, demReagg_2021)
+
+#vdem_reagg_2021_clean %>% View()
+
+
+#Join the datasets
+#First, we must join earliest_dem_year with vdem_reagg by year and country_name
+#Remove all observations from vdem_reagg that don't correspond to those countries and years.
+#Left join?
+
+
+# Join with the data to get the liberalism score in the year prior to democratization
+# This will give us one row for each country that was once a democracy. 
+#The row will have the prior year and all the data for the prior year.
+dem_countries_joined <- earliest_dem_year %>% 
+  left_join(vdem_reagg, by = c("country_name" = "country_name", "prior_year" = "year"))
+
+dem_countries_joined_2 = dem_countries_joined %>% left_join(max_point_dem_vdem, by = "country_name")
+
+#View
+dem_countries_joined_2 %>% View()
+
+
+
+
+
+#Now join it with the 2021 dataset to get the 2021 democracy score of each country that once democratized
+#We want to make sure we have a 2021 value for every country in the dataset. 
+#If it doesn't have a 2021 value, get rid of it
+#But we also only want these 120 countries
+#So left join preserves the first dataset
+#So we need to join the pre-joined dataset to the 2021 dataset
+
+dem_join_2 = dem_countries_joined_2 %>% left_join(vdem_reagg_2021_clean, by = "country_name")
+
+#Create variable decline_polyarchy, which is defined as positive
+#More backsliding is a higher positive number, no backsliding is zero. 
+dem_join_2 = dem_join_2 %>% mutate(decline_polyarchy = max_polyarchy_score - polyarchy_2021, 
+                                   decline_demReagg = max_demReagg_score - demReagg_2021)
+dem_join_2 %>% View()
+
+#dem_join_2 description:
+#Contains the following variables:
+#country_name (country name)
+#earliest_year (year that it first became democratic)
+#prior_year (year immediately before it first became democratic)
+#polyarchy_2021 (the country's polyarchy score in 2021)
+#max_polyarchy_score (country's historic maximum polyarchy score)
+#decline_polyarchy (polyarchy_2021 - max_polyarchy_score = amount of democratic backsliding the country has experienced, based on V-Dem's aggregation)
+##demReagg_2021 (the country's demReagg score in 2021)
+#max_demReagg_score (country's historic maximum demReagg score)
+#decline_demReagg (demReagg_2021 - max_demReagg_score = amount of democratic backsliding the country has experienced, based on my aggregation)
+#All other variables (scores for these variables during prior_year)
+
+
+#First analysis:
+
+#linear regression
+#IV: liberalism score during year prior to democratization (v2x_liberal)
+#DV: democracy score in 2021 (polyarchy_2021)
+
+#First filter out the NA's:
+#Technically we only care if v2x_liberal or polyarchy_2021 are missing
+#But there are few enough NAs that it shouldn't matter.
+dem_join_2_rmNA = na.omit(dem_join_2)
+
+dem_join_2_rmNA %>% View()
+str(dem_join_2_rmNA)
+
+
+#Is there a correlation between a country's current democracy score and it's liberalism score at the time of first democratization?
+crossline <- lm(polyarchy_2021 ~ v2x_liberal, data = dem_join_2_rmNA)
+
+# Print the summary of the regression model
+summary(crossline)
+
+#Result: Very strong correlation
+
+
+
+
+#Let's add in year to see if that matters too. 
+#Are the countries that democratized earlier more likely to still be democracies today?
+
+crossline2 <- lm(polyarchy_2021 ~ v2x_liberal + prior_year, data = dem_join_2_rmNA)
+
+# Print the summary of the regression model
+summary(crossline2)
+
+#Results: 
+#Correlation between prior year lib score and current dem score disappears
+#Correlation between prior year and current dem score is very strong
+
+#Try the same analyses using my own liberalism and democracy indices
+#IV: libReagg
+#DV: demReagg_2021
+
+crossline3 = lm(demReagg_2021 ~ libReagg + prior_year, data = dem_join_2_rmNA)
+summary(crossline3)
+
+crossline4 = lm(demReagg_2021 ~ libReagg, data = dem_join_2_rmNA)
+summary(crossline4)
+
+
+
+#It could be that the results from before 1945 are significantly different from those after
+#Reasons: democratization, cultural differences, time
+#Try to subset the data into only post-1945 and see the results: 
+
+dem_join_post_1945 = dem_join_2_rmNA %>% subset(earliest_year > 1945)
+
+crossline5 <- lm(polyarchy_2021 ~ v2x_liberal, data = dem_join_post_1945)
+summary(crossline5)
+
+crossline6 <- lm(polyarchy_2021 ~ v2x_liberal + prior_year, data = dem_join_post_1945)
+summary(crossline6)
+
+crossline7 <- lm(demReagg_2021 ~ libReagg, data = dem_join_post_1945)
+summary(crossline7)
+
+crossline8 <- lm(demReagg_2021 ~ libReagg, data = dem_join_post_1945)
+summary(crossline8)
+
+
+
+
+#Second Analysis
+#Use decline_polyarchy as DV, same IVs, controls.
+
+
+
+
+
+
+
+#Is there a correlation between a country's current democracy score and it's liberalism score at the time of #first democratization?
+reg_backslide <- lm(decline_polyarchy ~ v2x_liberal, data = dem_join_2_rmNA)
+
+# Print the summary of the regression model
+summary(reg_backslide)
+
+#Result: Strong and negative correlation
+#Interpretation: Countries which were more liberal before democratizing have expienced much less backsliding then countries which were less liberal. 
+
+
+
+
+#Let's add in year to see if that matters too. 
+#Are the countries that democratized earlier more likely to have experienced less backsliding?
+
+reg_backslide_2 <- lm(decline_polyarchy ~ v2x_liberal + prior_year, data = dem_join_2_rmNA)
+
+# Print the summary of the regression model
+summary(reg_backslide_2)
+
+#Results: 
+#Correlation between prior year lib score and backsliding amount is weak and negative
+#Correlation between prior year and backsliding amount is insignificant (and positive).
+
+#Interpretation: There is perhaps a statistically significant correlation between the amount of backsliding that #has occured in a country and the level of liberalism at the time of democratization. Countries which #liberalized first and then democratized have experienced less backsliding than those who democratized first and #then liberalized. 
+
+
+#Put it to the test using a slightly modified dataset:
+#Alternatively, exclude countries which have experienced no backsliding:
+#Only countries where decline_polyarhcy < 0
+
+only_backslide = dem_join_2_rmNA %>% subset(decline_polyarchy > 0)
+#only_backslide %>% View()
+
+
+
+reg_backslide_2.5 <- lm(decline_polyarchy ~ v2x_liberal + prior_year, data = only_backslide)
+summary(reg_backslide_2.5)
+
+#Results: 
+#Slightly significant and negative correlation between v2x_liberal and decline_polyarchy
+#Slightly significant and positive correlation between prior_year and decline_polyarchy
+#Interpretation: Countries that democratized later have experienced less backsliding. 
+#And countries which liberalized before democratizing have experienced less backsliding. 
+
+
+
+#Try the same analyses using my own liberalism and democracy indices
+#IV: libReagg
+#DV: demReagg_2021
+
+
+reg_backslide4 = lm(decline_demReagg ~ libReagg, data = dem_join_2_rmNA)
+summary(reg_backslide4)
+
+
+reg_backslide3 = lm(decline_demReagg ~ libReagg + prior_year, data = dem_join_2_rmNA)
+summary(reg_backslide3)
+
+#Results: Significant effect of prior_year on decline_demReagg
+#Countries which democratized later experience more backsliding, but only very slightly (coeff is very small, #positive). 
+#Effect of libReagg disappears after controlling for prior_year. 
+
+
+
+#It could be that the results from before 1945 are significantly different from those after
+#Reasons: democratization, cultural differences, time
+#Try to subset the data into only post-1945 and see the results: 
+
+dem_join_post_1945 = dem_join_2_rmNA %>% subset(earliest_year > 1945)
+
+reg_backslide5 <- lm(decline_polyarchy ~ v2x_liberal, data = dem_join_post_1945)
+summary(reg_backslide5)
+
+#Insignificant (and negative) correlation
+
+reg_backslide6 <- lm(decline_polyarchy ~ v2x_liberal + prior_year, data = dem_join_post_1945)
+summary(reg_backslide6)
+
+#Insignificant (and negative) correlation between v2x_liberal in year prior and decline_polyarchy
+#Insigificant (and negative) correlation between prior_year and decline_polyarchy
+#Makes sense because prior_year is basically a proxy for Western vs. non-Western, and so is pre/post-1945
+
+reg_backslide7 = lm(decline_demReagg ~ libReagg, data = dem_join_post_1945)
+summary(reg_backslide7)
+
+
+reg_backslide8 = lm(decline_demReagg ~ libReagg + prior_year, data = dem_join_post_1945)
+summary(reg_backslide8)
+
+#Results: There is no statistically significant correlation whatsoever.
+#Coefficient on libReagg is negative, meaning that countries which liberalized earlier tend to experience less backsliding, but the difference is not significant.
+
+
+
+#When only looking at countries who have experienced backsliding: 
+reg_backslide9 = lm(decline_demReagg ~ libReagg + prior_year, data = only_backslide)
+summary(reg_backslide9)
+
+#Results: Significant effect of prior_year on decline_demReagg
+#Countries which democratized later experience more backsliding, but only very slightly (coeff is very small, #positive). 
+#Effect of libReagg disappears after controlling for prior_year. 
+
+
+
+
+
+
+#Should do an additional regression with a control for economic development
+#According to Treisman's Powerpoint, higher economic development and passage of time are associated with survival of democratic elements
+#According to ChatGPT, adding this third variable could actually make the liberalism variable significant again
+#This is especially possible when there is high multicollinearity, which is the case here. 
+#So I should check on that. 
+
+
+#Format results in stargazer table
+library(stargazer)
+library(haven)
+#Use the stargazer function
+#Display all four models at once, and give the table and variables proper labels
+
+#stargazer::stargazer(reg_backslide3, reg_backslide4, reg_backslide7, reg_backslide8, type = "text", title = #"Table 1",
+#                     dep.var.labels= c("decline_demReagg"),
+#                     covariate.labels = c("prior_year", "lib_Reagg"), 
+#                     omit.stat=c("LL","ser","f"),
+#                     no.space=TRUE,
+#                     out = "regression_results.html")
+
+
+#Thanks, Emily!
+stargazer(reg_backslide4, reg_backslide3, reg_backslide7, reg_backslide8, type="text", title = "Table 1: Regression Results: The Impact of Liberalizaiton on Democratic Success", align=TRUE,dep.var.labels=c("Amount of Democratic Backsliding Experienced"), covariate.labels=c("Liberalism Score at Transition","Year of Transition"), out="models.html", font.size = "normalsize", omit.stat=c("LL", "ser", "f"), no.space=TRUE)
+
+
+
+```
+
+
+```{r}
+#Are the results the same for transitions to liberal democracy?
+#For IV, we have to substitute the ratio of liberalism to democracy for the liberalism score
+#because a country can enter the quadrant from either the bottom or the left
+
+
+# Subset the data to include only countries that were at one point liberal democracies
+#This selects only the time that they were liberal democracies
+libdem_countries <- vdem_reagg %>% filter((v2x_polyarchy > 0.5 & v2x_liberal > 0.8))
+
+# Find the earliest year of liberal democracy for each country
+earliest_libdem_year <- libdem_countries %>% 
+  group_by(country_name) %>%
+  summarize(earliest_year = min(year))
+
+#Calculate the prior year
+earliest_libdem_year = earliest_libdem_year %>% mutate(prior_year = earliest_year - 1)
+earliest_libdem_year %>% View()
+
+#Get 2021 scores for each country
+#Already done in the above code chunk
+#Also already cleaned
+#vdem_reagg_2021_clean %>% View()
+
+
+#Join the datasets
+#First, we must join earliest_libdem_year with vdem_reagg by year and country_name
+#Remove all observations from vdem_reagg that don't correspond to those countries and years.
+#Left join
+
+
+# Join with the data to get the lib/dem ratio in the year prior to democratization
+# This will give us one row for each country that was once a democracy. 
+# The row will have the prior year and all the data for the prior year.
+libdem_countries_joined <- earliest_libdem_year %>% 
+  left_join(vdem_reagg, by = c("country_name" = "country_name", "prior_year" = "year"))
+
+libdem_countries_joined %>% View()
+
+#Calculate ratios
+libdem_joined = libdem_countries_joined %>%
+  mutate(ratio_original = v2x_liberal / v2x_polyarchy,
+         ratio_josh = libReagg / demReagg)
+
+
+
+#Now join it with the 2021 dataset to get the 2021 democracy score of each country that once democratized
+#We want to make sure we have a 2021 value for every country in the dataset. 
+#If it doesn't have a 2021 value, get rid of it
+#But we also only want these 120 countries
+#So left join preserves the first dataset
+#So we need to join the pre-joined dataset to the 2021 dataset
+
+libdem_join_2 = libdem_joined %>% left_join(vdem_reagg_2021_clean, by = "country_name")
+libdem_join_rm = na.omit(libdem_join_2)
+
+libdem_join_rm %>% View()
+#str(libdem_join_rm)
+
+
+#libdem_join_2 description:
+#Contains the following variables:
+#country_name (country name)
+#earliest_year (year that it first became democratic)
+#prior_year (year immediately before it first became democratic)
+#polyarchy_2021 (the country's polyarchy score in 2021)
+#ratio_original (ratio of v2x_liberal to v2x_polyarchy during year prior to becoming a liberal democracy)
+#ratio_josh (ratio of libReagg to demReagg during year prior to becoming a liberal democracy)
+#All other variables (scores for these variables during prior_year)
+
+
+#Analysis:
+
+#linear regression
+#IV: liberalism score during year prior to democratization (v2x_liberal)
+#DV: democracy score in 2021 (polyarchy_2021)
+#Covariates of interest: prior_year (+ others?)
+
+ld_enter = lm(polyarchy_2021 ~ ratio_original, data = libdem_join_rm)
+summary(ld_enter)
+
+ld_enter2 = lm(demReagg_2021 ~ ratio_josh, data = libdem_join_rm)
+summary(ld_enter2)
+
+ld_enter3 = lm(polyarchy_2021 ~ ratio_original + prior_year, data = libdem_join_rm)
+summary(ld_enter3)
+
+ld_enter4 = lm(demReagg_2021 ~ ratio_josh + prior_year, data = libdem_join_rm)
+summary(ld_enter4)
+
+#Results for ratio are pretty much null across the board
+#Except in arguably the best model (#4), we actually see a small degree of significance.
+#But it is in the opposite direction of my hypothesis. 
+#It suggests that a smaller ratio of liberalism to democracy at democratization is correlated with a larger democracy score today. So the countries that had a higher degree of democracy relative to liberalism when they became liberal democracies are more democratic today. In other words, countries which democratized first and became liberal second may be more successful democracies than those that did the reverse.
+#Counterintuitive. 
+
+#See if the results hold or are more pronounced for post-1945 democratization: 
+
+libdem_post_1945 = libdem_join_rm %>% subset(earliest_year > 1945)
+
+libdem_post_1945 %>% View()
+
+ld_enter5 = lm(polyarchy_2021 ~ ratio_original, data = libdem_post_1945)
+summary(ld_enter5)
+
+ld_enter6 = lm(demReagg_2021 ~ ratio_josh, data = libdem_post_1945)
+summary(ld_enter6)
+
+ld_enter7 = lm(polyarchy_2021 ~ ratio_original + prior_year, data = libdem_post_1945)
+summary(ld_enter7)
+
+ld_enter8 = lm(demReagg_2021 ~ ratio_josh + prior_year, data = libdem_post_1945)
+summary(ld_enter8)
+
+
+#The ratio variables are insignificant in all of these models
+#Conclusion after viewing these 16 models:
+#A country's success in avoiding democratic backsliding is not correlated with
+#whether it adopted liberalism or democracy first.
+
+
+
+
+
+
+
+
+
+
+
+#Could also use current liberalism score as a DV instead of democracy score
+
+
+#A better DV is change from max value to current value.
+#It is probable that the countries which democratized earlier have a higher current value but also a higher max value
+#See if the results change. 
+
+
+
+
+```
+
+```{r}
+#Get R-squared values:
+#Use the same function, but cut out all the graphing stuff
+
+#vdem_reagg %>% View()
+
+r2_analysis <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(AD == year)
+  
+  return(summary(lm(demReagg ~ libReagg, data = vdem_reagg_year))$r.squared)
+}
+
+# Create an empty vector to store R-squared values
+r_squared_values <- c()
+
+# Iterate over the years and collect R-squared values
+for (annum in unique(vdem_reagg$year)) {
+  r_squared <- r2_analysis(vdem_reagg, annum)
+  r_squared_values <- c(r_squared_values, r_squared)
+}
+
+# Plot R-squared values over time
+plot(unique(vdem_reagg$year), r_squared_values, type = "b", xlab = "Year", ylab = "R-squared Coefficient", xlim = c(1790, 2010))
+title(main = "Correlation of Democracy and Liberalism Over Time (Re-Aggregated Indices)")
+
+#Results here show that democracy and liberalism do not necessarily go hand in hand
+
+
+#But how much of this is because of my coding?
+#Do we see the same results if we use polyarchy and v2x_liberal (original dem and lib indices made by VDEM)?
+#Let's see:
+
+r2_analysis_og <- function(data, AD) {
+  vdem_reagg_year <- data %>% filter(AD == year)
+  
+  return(summary(lm(v2x_polyarchy ~ v2x_liberal, data = vdem_reagg_year))$r.squared)
+}
+
+# Create an empty vector to store R-squared values
+r_squared_values_og <- c()
+
+# Iterate over the years and collect R-squared values
+for (annum in unique(vdem_reagg$year)) {
+  r_squared_og <- r2_analysis_og(vdem_reagg, annum)
+  r_squared_values_og <- c(r_squared_values_og, r_squared_og)
+}
+
+# Plot R-squared values over time
+plot(unique(vdem_reagg$year), r_squared_values_og, type = "b", xlab = "Year", ylab = "R-squared")
+title(main = "R-squared of Dem and Lib over Time (Original Indices)")
+
+
+#Do it backwards to make sure r2 is the same
+
+
+```
+
+
+```{r}
+#Find countries that were true liberal autocracies.
+#Based on the paper "Regimes of the World (ROW)" by Luhrmann, Tannenburg, and Lindberg,
+#a democracy is classified as such if it's polyarchy score is > 0.5
+#and it is classified as a liberal democracy if it's v2x_liberal score is > 0.8
+#among other things (which I ignore now for simplicity's sake)
+
+#Using this, I will examine if any regimes throughout history were liberal autocracies
+#To be a liberal autocracy under my definition, you would to meet these two criteria:
+#demReagg < 0.5
+#libReagg > 0.7
+
+#Let's see
+
+liberal_autocracies_josh = vdem_reagg %>% subset(demReagg < 0.5 & libReagg > 0.7)
+liberal_autocracies_josh %>% View()
+
+#Answer: Germany 1949 and Poland 1990
+
+#What about using polyarchy and v2x_liberal?
+liberal_autocracies_vdem = vdem_reagg %>% subset(v2x_polyarchy < 0.5 & v2x_liberal > 0.8)
+liberal_autocracies_vdem %>% View()
+
+#Answer: A lot
+#About half of current liberal democracies were once liberal autocracies according to this definition
+
+#Did all of the liberal autocracies eventually become liberal democracies?
+
+unique_libautos_vdem = unique(liberal_autocracies_vdem$country_name)
+
+#As list:?
+unique_libautos_vdem
+
+cut_dem_vdem = 0.5
+cut_lib_vdem = 0.8
+
+#install.packages("gganimate")
+#install.packages("animation")
+library(animation)
+library(ggplot2)
+library(gganimate)
+library(magick)
+
+plot_libautos_vdem <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  data_filtered <- data %>% filter(country_name %in% unique_libautos_vdem & !is.na(v2x_polyarchy) & !is.na(v2x_liberal))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, label = country_name)) +
+    geom_point(color = "lightblue", size = 3, show.legend = FALSE) +
+     geom_text(aes(label = country_name), vjust = 1, hjust = 1, size = 3) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = cut_dem, color = "green", linetype = "dashed") +
+    geom_vline(xintercept = cut_lib, color = "green", linetype = "dashed") +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("") +
+    transition_states(year, transition_length = 0.5, state_length = 0) +
+    enter_fade() +
+    exit_fade() +
+    view_follow(fixed_y = TRUE) +
+    ease_aes('linear') +
+    labs(title = "Year: {round(range(data_filtered$year)[1] + (range(data_filtered$year)[2] - range(data_filtered$year)[1]) * (frame / nframes))}")
+  
+  # Animate the plot
+  anim <- animate(p, nframes = length(unique(data_filtered$year)), fps = 5)
+  
+  return(anim)
+}
+
+# Let it run
+animation_libautos_vdem <- plot_libautos_vdem(vdem_reagg)
+animation_libautos_vdem
+
+
+
+
+
+
+
+
+
+
+
+#What about using demRmin and libReagg?
+liberal_autocracies_min = vdem_reagg %>% subset(demRmin < 0.5 & libReagg > 0.8)
+liberal_autocracies_min %>% View()
+
+#Answer: Germany 1949
+
+
+
+
+
+#How to compare illiberal democracies to liberal autocracies? 
+#Use V-dem's liberal democracy index, which aggregates the two
+#Countries which have the same score on the liberal democracy index should be comparable
+#You can then match on liberal democracy score between countries in the fourth and second quadrants
+
+```
+
+
+
+```{r}
+#Plot Tanzania's progression through 2D space over time:
+library(ggrepel)
+
+plot_tanzania <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Benin"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(v2x_liberal) & !is.na(v2x_polyarchy)))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy)) +
+    geom_line(size = 0.9, color = "blue") +
+    geom_point(size = 0.9, color = "blue") +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    #geom_text_repel(aes(label = year), size = 3, max.overlaps = Inf) +
+    geom_text_repel(data = data_filtered %>% filter(ifelse(year %% 2 == 0, FALSE, TRUE)), aes(label = year), size = 3, max.overlaps = Inf) +
+    #geom_text_repel(aes(label = year), size = 3) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Current ED, former LD)")
+  
+  return(p)
+}
+
+# Usage example
+plot_tanzania(vdem_reagg)
+
+
+
+
+
+
+
+plot_tanzania <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_countries <- c(
+    "Benin"
+  )
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_countries & !is.na(v2x_liberal) & !is.na(v2x_polyarchy)))
+  
+  # Reorder the data by the "year" variable and convert it to a factor
+  data_filtered <- data_filtered %>%
+    arrange(year) %>%
+    mutate(year = factor(year))
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, group = year)) +
+    geom_line(size = 0.9, color = "blue") +
+    geom_point(size = 0.9, color = "blue") +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    geom_text_repel(aes(label = year), size = 3) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle("Progress Over Time, v2x_polyarchy vs. v2x_liberal (Current ED, former LD)")
+  
+  return(p)
+}
+
+# Usage example
+plot_tanzania(vdem_reagg)
+
+
+
+
+
+
+
+
+
+
+plot_tanzania <- function(data) {
+  
+  # Filter out missing values and select specific countries
+  selected_country <- "Tanzania"
+  
+  data_filtered <- data %>% 
+    filter((country_name %in% selected_country & !is.na(v2x_liberal) & !is.na(v2x_polyarchy)))
+  
+  # Reorder the data by the "year" variable and convert it to a factor
+  data_filtered <- data_filtered %>%
+    arrange(year) %>%
+    mutate(year = factor(year))
+  
+  #View(data_filtered)
+  
+  # Create a ggplot object
+  p <- ggplot(data_filtered, aes(x = v2x_liberal, y = v2x_polyarchy, group = year)) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+    geom_hline(yintercept = 0.5, color = "green", linetype = "solid", size = 2) +
+    geom_vline(xintercept = 0.8, color = "green", linetype = "solid", size = 2) +
+    geom_point(size = 0.9, color = "blue") +
+    geom_line(size = 0.9, color = "blue") +
+    geom_text_repel(aes(label = year), size = 3) +
+    theme_bw() +
+    labs(x = "Liberalism Score", y = "Democracy Score") +
+    ggtitle(paste0("Progress Over Time, ", selected_country))
+  
+  return(p)
+}
+
+# Usage example
+plot_tanzania(vdem_reagg)
+
+
+
+
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

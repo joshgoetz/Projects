@@ -1,0 +1,695 @@
+---
+title: "Problem Set 4"
+author: "Josh Goetz"
+date: "2023-11-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+#Remove stuff 
+rm(list=ls()) 
+
+
+#Load libraries
+library(jsonlite)
+library(dplyr)
+library(stringr)
+
+##stm is the structural topic model packages from Roberts and Stewart
+#install.packages('stm')
+#  Based on Justin Grimmer's code
+library(stm)
+
+##SnowballC enables some kinds of stemming
+#install.packages('SnowballC')
+library(SnowballC)
+#library("tm", SnowballC)
+
+library(tm)
+
+
+#Filepath to downloaded JSON file
+json_file_path <- "C:/Users/OSU/UCLA/UCLA Quarter IV/209/nyt_ac.json"
+
+# Read the JSON file into R
+articles <- fromJSON(json_file_path)
+
+# Print the structure of the data
+#str(articles)
+
+
+
+
+
+#The data are organized in an interesting way
+#There are only two "variables" - "body" and "meta"
+#But each variable has mulitple columns
+#E.g. Body has body$text and body$title
+#Meta has a bunch of metadata
+
+
+tnt = articles$body
+
+#nrow(tnt)
+
+#body = tnt[[1]][["body"]][["body_text"]]
+#body
+
+#tnt$body$title[1]
+
+
+
+tnt$title
+
+
+#Got help from Ananya and Clayton on this part - Thanks!
+
+
+
+for (i in 1:nrow(tnt)) {
+  body <- tnt$body_text[i]
+  title <- tnt$title[i] %>%
+    str_replace_all(" ", "") %>%
+    str_replace_all("'", "") %>%
+    str_replace_all("/", "") %>%
+    str_replace_all("\\?", "") %>%
+    str_replace_all("|", "") %>%
+    str_replace_all(";", "") %>%
+    str_replace_all(".", "")
+
+  sink(paste0("C:/Users/OSU/UCLA/UCLA Quarter IV/209/Pset 4/article_", i, ".txt"))
+  cat(body)
+  sink()
+}
+
+
+
+#Create document term matrix
+
+#Gather documets into a corpus
+corpus.raw <- Corpus(DirSource("C:/Users/OSU/UCLA/UCLA Quarter IV/209/Pset 4"))
+
+
+
+#The following code is adapted from Michelle Torres "06_TextAnalysis_I" file
+## make lower case
+corpus.prep <- tm_map(corpus.raw, content_transformer(tolower)) 
+corpus.prep[[1]]$content
+corpus.prep[[1]]$meta # metadata to edit
+
+
+
+## remove white space
+corpus.prep <- tm_map(corpus.prep, stripWhitespace) # and \n!
+corpus.prep[[1]]$content
+
+## remove punctuation 
+corpus.prep <- tm_map(corpus.prep, removePunctuation)
+corpus.prep[[1]]$content
+
+## remove numbers
+corpus.prep <- tm_map(corpus.prep, removeNumbers) 
+corpus.prep[[1]]$content
+
+# let's check stop words in english
+head(stopwords("english"), 20) # note the pronouns, can you think of cases where some of these
+# might be useful to retain?
+
+## remove stop words 
+corpus <- tm_map(corpus.prep, removeWords, stopwords("english")) # you can customize your list 
+corpus[[1]]$content
+
+## finally stem remaining words
+corpus <- tm_map(corpus, stemDocument) # Consider lemmatizing!
+corpus[[1]]$content
+
+
+
+
+### Let's build our Document-Term Matrix
+dtm <- DocumentTermMatrix(corpus)
+dtm
+dtm$nrow
+dtm$ncol
+dtm$i
+
+#There's 1 row for each document
+#There's 1 column for each term
+#The number in each cell corresponds to the number of times that term appears in that document
+
+#Xplore that data!
+str(dtm)
+inspect(dtm[1:10,1:10])
+
+#Reformat as matrix
+dtm.mat <- as.matrix(dtm)
+head(dtm.mat[,1:10])
+
+
+#1000 most-used terms
+#Most used terms are columns with the highest sums across rows
+
+
+
+#Calculate column sums
+column_sums <- colSums(dtm.mat)
+
+#Identify the indices of the top 1000 columns
+top_columns_indices <- order(column_sums, decreasing = TRUE)[1:1000]
+
+#Subset matrix to keep only the top 1000 columns
+top1k <- dtm.mat[, top_columns_indices]
+
+dim(top1k)
+#Good! 288 x 1000
+
+#uses = colSums(top1k)
+#uses
+
+
+
+desk = articles$meta$dsk
+
+full_top1k = as.matrix(cbind(top1k, desk))
+dim(full_top1k)
+
+
+
+
+
+# term_use = colSums(dtm.mat)
+# 
+# length(term_use)
+# dtm_with_sums = rbind(dtm.mat, term_use)
+# 
+# 
+# 
+# 
+# corpus_prep = body_list
+# corpus_prep[i]
+# 
+# for (i in 1:length(body_list)){
+#   corpus_prep[i] = tolower(body_list[i])
+# }
+# 
+# corpus <- tm_map(corpus.prep, removeWords, stopwords("english")) # you can customize your list 
+# 
+# head(stopwords("english"), 20)
+# 
+# 
+# 
+# corpus.raw <- Corpus(body_list)
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# ## the output is truncated here to save space
+# content(corpus[[10]]) # Essay No. 10
+# 
+# ### Let's build our Document-Term Matrix
+# dtm <- DocumentTermMatrix(corpus)
+# dtm
+# dtm$nrow
+# dtm$ncol
+# dtm$i
+# str(dtm)
+# inspect(dtm[1:10,1:10])
+# 
+# dtm.mat <- as.matrix(dtm)
+# head(dtm.mat[,1:10])
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+
+
+
+
+##################################################
+
+# for (i in 1:nrow(tnt)){
+#  
+#   body <- tnt$body$body_text[i]
+#   title <- tnt$body$title[i] %>%
+#     str_replace_all(" ", "") %>%
+#     str_replace_all("'", "") %>%
+#     str_replace_all("/", "")
+#  
+#   print(title)
+#   
+#   sink(paste0("C:/Users/OSU/UCLA/UCLA Quarter IV/209/Pset 4", title, ".txt"))
+#   cat(body)
+#   sink()
+#  
+# }
+# 
+# 
+# 
+# for (i in 1:length(tnt)){
+#  
+#   body <- tnt[[i]][["body"]][["body_text"]]
+#   title <- tnt[[i]][["body"]][["title"]] %>%
+#     str_replace_all(" ", "") %>%
+#     str_replace_all("'", "") %>%
+#     str_replace_all("/", "")
+#  
+#   sink(paste0("/Users/ananyahariharan/Desktop/ps209_pset4/", title, ".txt"))
+#   cat(body)
+#   sink()
+#  
+# }
+
+
+
+
+
+
+
+```
+
+
+
+```{r}
+#Problem 2:
+
+#Ks
+
+#k <- 4  # number of clusters
+
+## run k-means
+#km.out <- kmeans(top1k, centers = k)
+#km.out$iter # check the convergence; number of iterations may vary
+
+
+
+#Part a)
+
+
+#Got help from ChatGPT on this part
+N = 10 #WTF is N?
+k_values <- 2:(N-1) 
+
+# Create an empty vector to store the objective function values
+objective_values <- numeric(length(k_values))
+
+# Loop through different k values and compute the k-means objective function
+#The objective function value is stored in the output and is called "tot.withinss"
+for (i in seq_along(k_values)) {
+  k <- k_values[i]
+  kmeans_result <- kmeans(top1k, centers = k)
+  objective_values[i] <- kmeans_result$tot.withinss  # Objective function value
+}
+
+# Plot the k-means objective function against the number of clusters (k)
+par(bg = "khaki")
+plot(k_values, objective_values, type = "b", 
+     main = "K-means Objective Function vs. Number of Clusters",
+     xlab = "Number of Clusters (k)", ylab = "Total Within-Cluster Sum of Squares")
+
+
+
+#Part b)
+
+
+#Apply K means with 6 clusters:
+set.seed(2803)
+k2 = 6
+
+km.out <- kmeans(top1k, centers = k2)
+km.out$iter # check the convergence; number of iterations may vary
+
+
+
+
+#Part c)
+
+
+
+#Isolate the theta values, which are the coordinates of the cluster center
+#I believe we are dealing with a 1000-D space (1000 dimensions)
+thetas = as.data.frame(km.out$centers)
+thetas
+
+
+
+
+
+
+#Calculate diff_1 through diff_6
+
+#We will create a data frame of diff values
+#Initialize it empty, fill it in with a loop
+
+#Initialize empty data frame for diff values
+# Number of rows and columns
+diff_num_rows <- 6
+diff_num_cols <- 1000
+
+# Create row and column names
+diff_row_names <- paste0("Diff", 1:diff_num_rows)
+diff_col_names = colnames(thetas)
+
+# Initialize an empty data frame
+diff <- data.frame(matrix(NA, nrow = diff_num_rows, ncol = diff_num_cols))
+rownames(diff) <- diff_row_names
+colnames(diff) = diff_col_names
+
+#Ignore
+#all_but_1 = thetas[-1, ]
+
+
+#For numbers 1-6, use the following formula to calculate diff_j
+for (j in 1:6){
+  other_rows = thetas[-j, ]
+  diff[j,] = thetas[j,] - (colSums(other_rows)/5) 
+}
+
+
+
+
+
+top_n_words <- 10
+
+# Function to get top words for each cluster
+get_top_words <- function(cluster_scores) {
+  top_word_indices <- order(cluster_scores, decreasing = TRUE)[1:top_n_words]
+  top_words = colnames(diff)[top_word_indices]
+  return(top_words)
+}
+
+# Apply the function to each row (cluster) in the matrix
+top_words <- apply(diff, 1, get_top_words)
+
+#Computer Labeling (take the top word from each cluster)
+# Display the top word indices for each cluster
+#I.e. label the clusters using their top ten words
+#Note: "Diff1" refers to Cluster 1. 
+print(top_words)
+
+
+
+
+#Yo, this is actually pretty cool!
+#Definitely a clear distinction in the topics for each cluster
+
+#Hand-labelling:
+#Cluster 1: American Politics
+#Cluster 2: Economy
+#Cluster 3: Sports
+#Cluster 4: Miscellaneous
+#Cluster 5: Elections
+#Cluster 6: Healthcare
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+#Problem 3: 
+
+#Download these txt files into R (Arr, Matey!)
+
+#Actually the link is broken so I got some csv files from his github page
+
+
+caren_pos = read.csv("C:/Users/OSU/UCLA/UCLA Quarter IV/209/positive.csv")
+caren_neg = read.csv("C:/Users/OSU/UCLA/UCLA Quarter IV/209/negative.csv")
+
+
+
+#Do we want it as a data frame or as just a big chunk of text?
+#Or as a list?
+
+#Let's try as a vector
+vec_pos = as.vector(caren_pos)
+vec_neg = as.vector(caren_neg)
+
+inside_vec_neg = vec_neg$abandoned
+inside_vec_pos = vec_pos$abidance
+
+
+#Remember, our document text is all in the body_text column of data frame "tnt"
+
+# Function to count positive and negative words in a document
+count_sentiment_words <- function(document, positive_words, negative_words) {
+  #Separate document into a bunch of words
+  #Might have to remove punctuation too, but let's not worry about that now. 
+  words <- unlist(strsplit(tolower(document), "\\s+"))
+  #Count number of words that match the positive and negative words
+  positive_count <- sum(words %in% positive_words)
+  negative_count <- sum(words %in% negative_words)
+  
+  #Return positive and negative counts
+  #Counts = scores
+  #These are positive and negative scores
+  return(c(positive_count = positive_count, negative_count = negative_count))
+}
+
+# Apply the function to each document and add new columns to the data frame
+sentiment_counts <- t(sapply(articles$body$body_text, count_sentiment_words, inside_vec_pos, inside_vec_neg))
+colnames(sentiment_counts) <- c("positive_count", "negative_count")
+articles_scores <- cbind(articles, sentiment_counts)
+
+articles_scores = articles_scores %>% mutate(score_diff = positive_count - negative_count)
+
+
+# Print the updated data frame
+#print(articles_scores)
+
+#str(tnt$body_text)
+
+
+
+
+#Plot results by election and by desk
+
+
+
+#By day:
+
+
+#plot(articles_scores$meta$publication_day_of_month, articles_scores$score_diff)
+
+
+# Set up the plotting area with a beige background
+par(bg = "pink")
+plot(1, type = "n", xlim = c(1, 3), ylim = c(min(articles_scores$score_diff), max(articles_scores$score_diff)), 
+     xlab = "Publication Day of Month", ylab = "Positive Score minus Negative Score", main = "Score Difference by Publication Day")
+
+# Create a boxplot with blue points
+boxplot(articles_scores$score_diff ~ articles_scores$meta$publication_day_of_month, 
+        col = "blue", add = TRUE, pch = 16)
+
+
+#Election seemed to have no significant effect.
+#Articles published after election (Nov. 3rd) have very similar sentiment
+#to articles published before election (Nov. 1st)
+#There are more negative outliers on Nov. 3rd, but this looks to be chance.
+
+
+
+
+
+#By desk:
+
+#par(bg = "lightgreen")
+#plot(1, type = "n", ylim = c(min(articles_scores$score_diff), max(articles_scores$score_diff)), 
+#     xlab = "Desk", ylab = "Positive Score minus Negative Score", main = "Score Difference by Desk")
+
+# Create a boxplot with blue points
+#boxplot(articles_scores$score_diff ~ articles_scores$meta$dsk, 
+#        col = "yellow", add = TRUE, pch = 16)
+
+boxplot(articles_scores$score_diff ~ articles_scores$meta$dsk)
+
+
+#This plot is super ugly
+#Not sure why I can't get the other parts of the code to work
+#Basically, there is a large degree of similarity across desks
+#But the desks related to entertainment do tend to be slightly more positive
+#And the ones related to foreign affairs are the most negative
+
+
+
+# Set up the plotting area with a light green background and adjust margins
+#par(bg = "lightgreen", mar = c(5, 4, 4, 2) + 0.1)
+
+# Create an empty plot
+#plot(1, type = "n", ylim = c(min(articles_scores$score_diff), max(articles_scores$score_diff)), 
+#     xlab = "Desk", ylab = "Positive Score minus Negative Score", main = "Score Difference by Desk")
+
+# Create a boxplot with extended range and custom colors
+#boxplot(articles_scores$score_diff ~ articles_scores$meta$dsk, 
+#        col = c("yellow", "orange", "lightblue", "lightcoral", "lightgreen", "lightsalmon", "lightseagreen"),
+#        add = TRUE, pch = 16, outer = TRUE)
+```
+
+
+
+```{r}
+
+#Problem 4
+#Part a
+#Reformatting data
+#Is this using the textProcessor function in Grimmer's stm library?
+#Let's try it:
+
+
+#good_format = textProcessor(full_top1k)
+
+#good_format2 = textProcessor(as.character(articles))
+
+
+#This is the right way to do it
+#The input is just the character version of the vector/column containing the actual text.
+#Not the whole data frame or the old document-term matrix
+arts = as.character(tnt$body_text)
+
+good_format3 = textProcessor(arts)
+
+good_format3$documents[1]
+
+
+
+# Extract the "vocab" vector from the list
+vocab <- good_format3$vocab
+
+# Function to replace indices with words in a matrix
+#replace_indices_with_words <- function(matrix_row, vocab) {
+#  words <- vocab[matrix_row]
+#  return(words)
+#}
+
+# Update list to replace indices with words
+#for (i in seq_along(good_format3$documents)) {
+#  good_format3$documents[[i]][1, ] <- replace_indices_with_words(good_format3$documents[[i]][1, ], vocab)
+#}
+
+
+
+good_list = good_format3$documents
+
+print(good_list[1])
+
+
+
+
+
+#Try Michelle's code (easier than what I tried):
+
+docs<- good_format3$documents
+
+##getting the documents ready for analysis
+out<- prepDocuments(docs, vocab)
+docs2<- out$documents
+vocab2<- out$vocab
+
+##we're now ready to use stm to fit an LDA run. the syntax is 
+vanilla_lda_fit<- stm(docs2, vocab2, K=8)
+
+labelTopics(vanilla_lda_fit)
+
+
+
+
+
+#Conditioning on desk
+
+desky <- as.character(articles$meta$dsk)
+part1<- textProcessor(arts, metadata = as.matrix(desky))
+#str(part1)
+
+##now creating the relevant objects again
+vocab_choc<- part1$vocab
+docs_choc<- part1$documents
+meta_choc<- part1$meta
+
+
+##prepping the documents for the run
+out_choc2<- prepDocuments(docs_choc, vocab_choc, meta_choc)
+vocab_choc<- out_choc2$vocab
+docs_choc<- out_choc2$documents
+meta_choc<- out_choc2$meta
+head(meta_choc)
+
+##now, running stm again, but now we're going to include type of product discussed to measure prevalence
+##to do this, we specify a formula with no dependent variable.  
+
+choco_lda_fit<- stm(docs_choc, vocab_choc, K = 8, prevalence = ~desky, data = meta_choc, seed = 1215228)
+
+
+labelTopics(choco_lda_fit)
+labelTopics(vanilla_lda_fit)
+
+
+c_lda = labelTopics(choco_lda_fit)
+c_lda_matrix = c_lda$score
+
+v_lda = labelTopics(vanilla_lda_fit)
+v_lda_matrix = v_lda$score
+
+#Part d) Compare the 8 topics from vanilla and chocolate (condition on desk) models
+#Both models yield similar output
+#First few words are virtually always the same
+#But later words can differ in order and inclusion (e.g. "sheik")
+
+
+
+#Part e
+#Build plots
+#Use heatmap function in R
+
+#Create function to identify instances where the matrices' values differ
+compare_matrices <- function(mat1, mat2) {
+  differences <- as.numeric(mat1 != mat2)
+  return(matrix(differences, nrow = nrow(mat1), ncol = ncol(mat1)))
+}
+
+# Get the differences between matrices
+differences <- compare_matrices(c_lda_matrix, v_lda_matrix)
+
+# Plot the heatmap
+heatmap(differences, col = c("white", "red"), main = "Differences Between Models")
+
+
+
+
+
+#Part f)
+#The effect of desk is to help determine whether certain associations make sense
+#For example, the vanilla LDA includes "sheik" as one of the 7 "score" words for Topic 6.
+#But the chocolate LDA does not do this. 
+#This is probably because the chocolate LDA conditions on desk
+#And the information provided by the "desk" variable allows the model to determine
+#That the word "sheik" probably isn't a central word to the topic. 
+#For example, Topic 6 appears to be about music or art
+#If all the documents the feature Topic 6 heavily come from the "Entertainment" desk,
+#Then the LDA model might realize that "sheik" is a fluke and might choose a word 
+#that is more closely related to the topic of "entertainment" instead. 
+
+
+
+
+
+
+```

@@ -1,0 +1,748 @@
+---
+title: "Antisemitism"
+author: "Josh Goetz"
+date: "2023-04-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+
+#OLD CODE. SKIP THIS CODE CHUNK. START AT LINE 265
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+#Load Data
+
+#2004 Data:
+#data = read.csv("Antisemitism ADL UN Voting.csv")
+
+#2014 data: 
+data = read.csv("Antisemitism ADL UN Voting 2014.csv")
+#data %>% View()
+
+#Filter out NAs
+data_short = data %>% filter(ADL.Score != "NA")
+#data_short %>% View()
+
+#How Many Yeses, Nos, Abstensions, and No Votes?
+table(data_short$Vote)
+
+#Results for 2004 Vote:
+#Y: 87
+#N: 2
+#A: 11
+#Z (Didn't Vote): 0
+
+#Results for 2014 Vote:
+#Y: 90
+#N: 3
+#A: 5
+#Z: 2
+
+#Remove Zs
+data_short = data_short %>% filter(Vote != "Z")
+#data_short %>% View()
+
+#Combine Abstains and Nos
+#As and Ns count as 0. Ys count as 1. 
+data_binary = data_short %>% mutate(Vote2 = case_when(
+  Vote == "Y" ~ 1,
+  Vote == "N" ~ 0,
+  Vote == "A" ~ 0
+))
+data_binary %>% View()
+
+
+
+
+
+#Try another way where abstains are counted as 0.5
+data_numerized = data_short %>% mutate(Vote2 = case_when(
+  Vote == "Y" ~ 1,
+  Vote == "N" ~ 0,
+  Vote == "A" ~ 0.5
+))
+#data_numerized %>% View()
+
+
+
+
+
+#This part is unnecessary for the regression. 
+#Split the data into two - calculate the mean of Yes and No/Abstain
+no_abstain = data %>% filter((Vote == "N" | Vote == "A" ) & ADL.Score != "NA")
+#no_abstain %>% View()
+avg_no_abstain = mean(no_abstain$ADL.Score)
+avg_no_abstain
+
+#Results for 2004 Vote:
+#25.38
+
+#Results from 2014 vote:
+#24.5
+
+yes = data %>% filter(Vote == "Y" & ADL.Score != "NA")
+#yes %>% View()
+avg_yes = mean(yes$ADL.Score)
+avg_yes
+
+#Results for 2004 Vote:
+#38.53
+
+#Result from 2014 vote: 
+#38.07
+
+no = data %>% filter((Vote == "N") & ADL.Score != "NA")
+#no_abstain %>% View()
+avg_no = mean(no$ADL.Score)
+avg_no
+
+#Results for 2004 Vote:
+#11.5 (This is just the average between the US and Australia)
+
+#Results from 2014 vote:
+#12.33
+
+
+
+
+#Run some regressions using the binary vote dataset
+#This is where Abstains and Nos count as 0s, but Yeses count as 1s. 
+
+#Basic regression (Binary vote on antisemitism)
+res_basic = lm(Vote2 ~ ADL.Score, data = data_binary)
+summary(res_basic)
+
+#Results for 2004 Vote:
+#p-value = 0.0586 (not statistically significant at the 0.05 level)
+
+#Results from 2014 Vote: 
+#p-value = 0.12
+
+#Run regression of Vote2 (binary vote) on ADL Score (variable of interest) and Region (control variable)
+res = lm(Vote2 ~ ADL.Score + Region, data = data_binary)
+summary(res)
+
+#Results for 2004 Vote:
+#p-value = 0.893
+#Intercept, Latin America, Sub-Saharan Africa, and Western Offshoots are significant
+#Interestingly, MENA is not
+#Asia is excluded group by default
+
+#Results for 2014 vote:
+#p-value = 0.758
+#Intercept, SSA, and WO are significant. MENA is not. ASIA is excluded
+
+
+
+
+
+#Rerun the same regressions using the dataset where abstain is 0.5 instead of 0
+
+#Basic regression (Vote on antisemitism)
+res_basic_2 = lm(Vote2 ~ ADL.Score, data = data_numerized)
+summary(res_basic_2)
+
+#Results for 2004 Vote:
+#p-value = 0.0368 (significant)
+
+#Results for 2014 Vote:
+#p-value = 0.0639 (insignificant at 0.05 level)
+
+#Run regression of Vote2 (binary vote) on ADL Score (variable of interest) and Region (control variable)
+res_2 = lm(Vote2 ~ ADL.Score + Region, data = data_numerized)
+summary(res_2)
+
+
+#Results for 2004 Vote:
+#p-value = 0.857
+#Intercept, Latin America, Sub-Saharan Africa, and Western Offshoots are significant
+#Interestingly, MENA is not
+#Asia is excluded group by default
+
+#Results for 2014 vote:
+#p-value = 0.830
+#Intercept, SSA, and WO are significant.
+
+
+
+#Chad
+#Use F-test for the nested models
+#Add interaction terms. Probably can't do that since some regions only vote yes
+#Sub-Saharan African and Latin America might be good (no strategic interests)
+#Add more data from other resolution. 
+
+
+
+
+
+
+#Final idea: Just group by MENA/non-MENA:
+#Use data_numerized since it has more significant p-value
+data_MENA = data_numerized %>% mutate(Region2 = case_when(
+  Region == "MENA" ~ "MENA",
+  Region != "MENA" ~ "Other"
+))
+#data_MENA %>% View()
+
+res_3 = lm(Vote2 ~ ADL.Score + Region2, data = data_MENA)
+summary(res_3)
+
+#Results for 2004 Vote:
+#p-value is 0.232 for ADL.Score (not significant)
+#p-value of region is 0.985 (not significant either)
+
+
+#Results for 2014 vote:
+#p-value = 0.150 for ADL Score
+#Region p-value = 0.623
+
+
+
+
+
+#Is antisemitism correlated with MENA/non-MENA?
+res_4 = lm(ADL.Score ~ Region2, data = data_MENA)
+summary(res_4)
+
+#Results for 2004 Vote:
+#Yes, p-value < 2e-16 for region (significant)
+
+#Results for 2014 vote:
+#Yes, p-value < 2e-16 for region (significant)
+
+
+#Is it antisemitism correlated with region in general?
+res_5 = lm(ADL.Score ~ Region, data = data_short)
+summary(res_5)
+
+#Results for 2004 Vote:
+#MENA and Western Offshoots are significant. And intercept
+#p-value < 2e-16 for MENA, 0.0362 for WO
+
+
+#Results for 2014 Vote:
+#Intercept, MENA, and Western Offshoots are significant. 
+#p-value is < 2e-16 for MENA, 0.0303 for WO.
+
+
+#Could try graphing as well
+plot(data_numerized$ADL.Score, data_numerized$Vote2, pch = 19, col = factor(data_numerized$Region))
+legend("bottomright", legend = c("ASIA", "EE", "LA", "MENA", "SSA", "WE", "WO"), pch = 19, col= 1:7)
+
+
+```
+
+
+```{r}
+
+#Try uploading Erik Voeten's dataset. 
+#When using the raw UN data, please cite: Erik Voeten "Data and Analyses of Voting in the UN General Assembly" Routledge Handbook of International Organization, edited by Bob Reinalda (published May 27, 2013). Available at SSRN: http://ssrn.com/abstract=2111149
+
+load("C:/Users/OSU/UCLA/Summer 2023/UNVotes.RData")
+
+#Note that when using "load", the object name is listed in the Global Environment
+unvotes = completeVotes
+#unvotes %>% View()
+
+votes2014 = unvotes %>% subset(year == 2014)
+#votes2014 %>% View()
+
+unresR6978 = votes2014 %>% subset(unres == "R/69/78")
+#unresR6978 %>% View()
+```
+
+
+```{r}
+#It was easier just to do it by hand
+#Here is a dataset of UN voting data on 19 resolutions that targeted Israel during the 2014-2015 UNGA session
+#A set of 20 resolutions targeting Israel was compiled by the organization "UN Watch"
+#From this, one was dropped, leaving 19 resolutions
+#In this data, Y = Yes, N = No, A = Abstain, Z = Did not vote / absent
+#A yes always corresponds to condemning Israel
+#Israel voted "NO" on all 19 resolutions
+#The 19 rightmost columns display the voting results for each resolution (each resolution gets its own column)
+#The dataset also contains additional columns that capture country characteristics
+#The main independent variable is "ADL Score", which measures how antisemitic a country is
+#This is based on ADL's Global 100 Survey. Higher scores mean more antisemitic
+#ADL surveyed 100 countries in 2014. Other iterations of the survey focused on fewer countries.
+#The column "Region" specifies which region a country belongs to 
+#This is a proxy for regional voting blocs and alliances
+
+
+#Load libraries:
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+#Import dataset:
+#Note, it is the csv file, not the xlsx file of the same name
+full19 = read.csv("C:/Users/OSU/UCLA/UCLA Quarter III/ADL UN Voting Data Only Full 19 Res.csv")
+#full19 %>% View()
+
+#Filter out NAs - only include countries with an ADL score
+full19_adl = full19 %>% filter(ADL.Score != "NA")
+#full19_adl %>% View()
+
+#Now time to try out a bunch of different aggregation methods
+
+#Method 1: Sum the votes row-wise, so each country has a total vote score summarizing all their votes
+
+#Note: A or Z votes are never counted as more than 0.5. 
+#In these votes, everyone knows the Ys will win, so an A or Z is not trying to change this result
+#Thus, the countries that vote in those ways can't be said to be siding with the Ys.
+
+#Assume that an A vote is halfway between a Y and an N
+#rmZ_split: Y = 1, N = 0, A = 0.5, Z = removed from dataset
+
+#Assume that A and N are the same, since both are a strong deviation from the norm and A vs. N won't change the result
+#rmZ_binary: Y = 1, N = 0, A = 0, Z = removed from dataset
+
+#Assume that A is just slightly more ambivalent than an N
+#rmZ_weighted: Y = 1, N = 0, A = 0.2, Z = removed from dataset
+
+#The following draw from Coggins, who in a presentation at UCLA, proposed the idea of strategic absences at the UN
+#In her view, Z votes are not random, and thus should not be dropped from the data
+#Counterargument is that states like Burundi just might not be able to send representatives, which is why they have a lot of Zs.
+
+#Assume that Zs and As are essentially the same (in both cases you choose not to vote, so the effect is the same)
+#coggins_equal: Y = 1, N = 0, A = 0.5, Z = 0.5
+
+#Assume that a Z is slighly stronger deviation from the norm than an A
+#coggins_strong: Y = 1, N = 0, A = 0.5, Z = 0.2
+
+#Assume that a Z is a slighly weaker deviation from the norm than an A
+#coggins_weak: Y = 1, N = 0, A = 0.2, Z = 0.5
+
+#Assume that Ns, As, and Zs are all essentially equal
+#coggins_binary: Y = 1, N = 0, A = 0, Z = 0
+
+
+
+#Of these seven possibilities, I believe rmZ_split, rmZ_binary, coggins_equal, and coggins_binary are the four most important ones to test.
+#So let's aggregate some scores in each of the methods
+
+
+
+#But wait. 
+#If we are summing row-wise, then if we omit the Zs, that is the same as treating the Zs as 0s. 
+#Wait, no it's not. 
+#Rather than summing row-wise, we should be calculating an average vote score
+#So removing the Zs will change the total number of votes a country participated in, so it will have an effect
+
+
+
+#Create a new column for full19_adl_rmZ dataset which counts the number of Zs and subtracts this from 19 
+#This gives us the total number of votes the country participated in. 
+
+
+#coggins_equal:
+library(dplyr)
+
+# Get the total number of columns in your dataframe
+total_columns <- ncol(full19_adl)
+
+# Define the column indices for the 19 rightmost columns
+vote_columns <- (total_columns - 18):total_columns
+
+# Replace Y with 1, N with 0, Z with 0.5, A with 0.5 in the specified columns
+full19_coggins_equal <- full19_adl %>%
+  mutate_at(vars(vote_columns), 
+            ~ recode(., Y = 1, N = 0, Z = 0.5, A = 0.5))
+
+coggins_equal = full19_coggins_equal %>% mutate(avg_vote_score = avg_vote_score <- rowSums(full19_coggins_equal[, vote_columns]) / length(vote_columns))
+#coggins_equal %>% View()
+
+# Load the ggplot2 library if it's not already loaded
+library(ggplot2)
+
+# Create a scatter plot
+ggplot(coggins_equal, aes(x = ADL.Score, y = avg_vote_score, color = Region)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = "lm", se = FALSE, aes(group = Region)) + #Add lines to the plot
+  labs(x = "Antisemitism Score", y = "Average Vote Score") +  # Set axis labels
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score")  # Set plot title + 
+  scale_color_discrete(name = "Region")
+
+
+#Now run some regressions using coggins_equal (CE) aggregation technique:
+res_ce_basic = lm(avg_vote_score ~ ADL.Score, data = coggins_equal)
+summary(res_ce_basic)
+
+#Control for region:
+res_ce_region = lm(avg_vote_score ~ ADL.Score + Region, data = coggins_equal)
+summary(res_ce_region)
+
+#Subset the data to only include regions that don't have significant diplomatic relations with Israel
+#First try excluding Western Europe, Western offshoots, MENA
+#Then try excluding everything except Sub-Saharan Africa and Latin America
+
+
+soft_exclude = coggins_equal %>% subset(Region == "SSA" | Region == "LA" | Region == "ASIA" | Region == "EE")
+hard_exclude = coggins_equal %>% subset(Region == "SSA" | Region == "LA")
+only_mena = coggins_equal %>% subset(Region == "MENA")
+
+res_ce_soft_exclude = lm(avg_vote_score ~ ADL.Score, data = soft_exclude)
+summary(res_ce_soft_exclude)
+
+res_ce_soft_Region = lm(avg_vote_score ~ ADL.Score + Region, data = soft_exclude)
+summary(res_ce_soft_Region)
+
+
+res_ce_hard_exclude = lm(avg_vote_score ~ ADL.Score, data = hard_exclude)
+summary(res_ce_hard_exclude)
+
+
+# Create a scatter plot for soft exclude
+ggplot(soft_exclude, aes(x = ADL.Score, y = avg_vote_score, color = Region)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = "lm", se = FALSE, aes(group = Region)) + #Add lines to the plot
+  labs(x = "Antisemitism Score", y = "Average Vote Score") +  # Set axis labels
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score")  # Set plot title + 
+  scale_color_discrete(name = "Region")
+  
+
+```
+
+
+
+
+```{r}
+#coggins_binary
+
+# Replace Y with 1, N with 0, Z with 0, A with 0 in the specified columns
+full19_coggins_binary <- full19_adl %>%
+  mutate_at(vars(vote_columns), 
+            ~ recode(., Y = 1, N = 0, Z = 0, A = 0))
+
+#full19_coggins_binary %>% View()
+
+coggins_binary = full19_coggins_binary %>% mutate(avg_vote_score = avg_vote_score <- rowSums(full19_coggins_binary[, vote_columns]) / length(vote_columns))
+#coggins_binary %>% View()
+
+# Create a scatter plot
+cb_plot = ggplot(coggins_binary, aes(x = ADL.Score, y = avg_vote_score, color = Region)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = "lm", se = FALSE, aes(group = Region)) + #Add lines to the plot
+  labs(x = "Antisemitism Score", y = "Average Vote Score") +  # Set axis labels
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score")  # Set plot title + 
+  scale_color_discrete(name = "Region")
+cb_plot
+
+#Now run some regressions using coggins_binary (CB) aggregation technique:
+res_cb_basic = lm(avg_vote_score ~ ADL.Score, data = coggins_binary)
+summary(res_cb_basic)
+
+#Control for region:
+res_cb_region = lm(avg_vote_score ~ ADL.Score + Region, data = coggins_binary)
+summary(res_cb_region)
+
+
+#Try excluding regions that have significant relations with Israel
+cb_soft_exclude = coggins_binary %>% subset(Region == "SSA" | Region == "LA" | Region == "ASIA" | Region == "EE")
+cb_hard_exclude = coggins_binary %>% subset(Region == "SSA" | Region == "LA")
+cb_only_mena = coggins_binary %>% subset(Region == "MENA")
+
+#cb_soft_exclude %>% View()
+
+res_cb_soft_exclude = lm(avg_vote_score ~ ADL.Score, data = cb_soft_exclude)
+summary(res_cb_soft_exclude)
+
+res_cb_soft_Region = lm(avg_vote_score ~ ADL.Score + Region, data = cb_soft_exclude)
+summary(res_cb_soft_Region)
+
+
+res_cb_hard_exclude = lm(avg_vote_score ~ ADL.Score, data = cb_hard_exclude)
+summary(res_cb_hard_exclude)
+
+# Create a scatter plot for soft exclude
+cb_plot_soft = ggplot(soft_exclude, aes(x = ADL.Score, y = avg_vote_score, color = Region)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = "lm", se = FALSE, aes(group = Region)) + #Add lines to the plot
+  labs(x = "Antisemitism Score", y = "Average Vote Score") +  # Set axis labels
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score")  # Set plot title + 
+  scale_color_discrete(name = "Region")
+  
+cb_plot_soft
+```
+
+
+
+
+```{r}
+#rmZ_split
+
+#Count the number of Zs for each country
+full19_rmZ_split = full19_adl %>% mutate(denominator = rowSums(full19_adl[vote_columns] != "Z"))
+
+z_gazer = full19_rmZ_split %>% subset(denominator != 19)
+
+# Replace Y with 1, N with 0, Z with 0, A with 0.5 in the specified columns
+rmZ_split_num = full19_rmZ_split %>% 
+  mutate_at(vars(vote_columns), 
+            ~ recode(., Y = 1, N = 0, Z = 0, A = 0.5))
+
+rmZ_split_summed = rmZ_split_num %>% mutate(numerator = rowSums(rmZ_split_num[vote_columns]))
+
+rmZ_split = rmZ_split_summed %>% mutate(avg_vote_score = numerator/denominator)
+
+
+# Create a scatter plot
+rs_plot = ggplot(rmZ_split, aes(x = ADL.Score, y = avg_vote_score, color = Region)) +
+  geom_point() +  # Add points to the plot
+  #geom_smooth(method = "lm", se = FALSE, aes(group = Region)) + #Add lines to the plot
+  labs(x = "Percent of Country's Population Harboring Antisemitic Attitudes", y = "Propensity to Vote Against Israel at UNGA") +  # Set axis labels
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score")  # Set plot title + 
+  scale_color_discrete(name = "Region")
+rs_plot
+
+
+#Now run some regressions using rmZ_split (rs) aggregation technique:
+res_rs_basic = lm(avg_vote_score ~ ADL.Score, data = rmZ_split)
+summary(res_rs_basic)
+
+#Control for region:
+res_rs_region = lm(avg_vote_score ~ ADL.Score + Region, data = rmZ_split)
+summary(res_rs_region)
+
+
+
+#Subset the data to only include regions that don't have significant diplomatic relations with Israel
+#First try excluding Western Europe, Western offshoots, MENA
+#Then try excluding everything except Sub-Saharan Africa and Latin America
+
+
+rs_soft_exclude = rmZ_split %>% subset(Region == "SSA" | Region == "LA" | Region == "ASIA" | Region == "EE")
+rs_hard_exclude = rmZ_split %>% subset(Region == "SSA" | Region == "LA")
+rs_only_mena = rmZ_split %>% subset(Region == "MENA")
+
+res_rs_soft_exclude = lm(avg_vote_score ~ ADL.Score, data = rs_soft_exclude)
+summary(res_rs_soft_exclude)
+
+res_rs_soft_Region = lm(avg_vote_score ~ ADL.Score + Region, data = rs_soft_exclude)
+summary(res_rs_soft_Region)
+
+
+res_rs_hard_exclude = lm(avg_vote_score ~ ADL.Score, data = rs_hard_exclude)
+summary(res_rs_hard_exclude)
+
+
+# Create a scatter plot for soft exclude
+rs_plot_soft = ggplot(rs_soft_exclude, aes(x = ADL.Score, y = avg_vote_score)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = "lm", se = FALSE) + #Add lines to the plot
+  labs(x = "Percent of Country's Population Harboring Antisemitic Attitudes", y = "Propensity to Vote Against Israel at UNGA") +  # Set axis labels
+  ggtitle("Excluding Western Europe, Western Offshoots, and MENA")  # Set plot title + 
+  
+rs_plot_soft
+```
+
+
+
+
+
+```{r}
+#rmZ_binary
+
+#Count the number of Zs for each country
+full19_rmZ_binary = full19_adl %>% mutate(denominator = rowSums(full19_adl[vote_columns] != "Z"))
+
+# Replace Y with 1, N with 0, Z with 0, A with 0.5 in the specified columns
+rmZ_binary_num = full19_rmZ_binary %>% 
+  mutate_at(vars(vote_columns), 
+            ~ recode(., Y = 1, N = 0, Z = 0, A = 0))
+
+rmZ_binary_summed = rmZ_binary_num %>% mutate(numerator = rowSums(rmZ_binary_num[vote_columns]))
+
+rmZ_binary = rmZ_binary_summed %>% mutate(avg_vote_score = numerator/denominator)
+
+
+# Create a scatter plot
+rb_plot = ggplot(rmZ_binary, aes(x = ADL.Score, y = avg_vote_score, color = Region)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = "lm", se = FALSE, aes(group = Region)) + #Add lines to the plot
+  labs(x = "Antisemitism Score", y = "Average Vote Score") +  # Set axis labels
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score")  # Set plot title + 
+  scale_color_discrete(name = "Region")
+rb_plot
+
+
+#Now run some regressions using rmZ_binary (rb) aggregation technique:
+res_rb_basic = lm(avg_vote_score ~ ADL.Score, data = rmZ_binary)
+summary(res_rb_basic)
+
+#Control for region:
+res_rb_region = lm(avg_vote_score ~ ADL.Score + Region, data = rmZ_binary)
+summary(res_rb_region)
+
+
+
+#Subset the data to only include regions that don't have significant diplomatic relations with Israel
+#First try excluding Western Europe, Western offshoots, MENA
+#Then try excluding everything except Sub-Saharan Africa and Latin America
+
+
+rb_soft_exclude = rmZ_binary %>% subset(Region == "SSA" | Region == "LA" | Region == "ASIA" | Region == "EE")
+rb_hard_exclude = rmZ_binary %>% subset(Region == "SSA" | Region == "LA")
+rb_only_mena = rmZ_binary %>% subset(Region == "MENA")
+
+res_rb_soft_exclude = lm(avg_vote_score ~ ADL.Score, data = rb_soft_exclude)
+summary(res_rb_soft_exclude)
+
+res_rb_soft_Region = lm(avg_vote_score ~ ADL.Score + Region, data = rb_soft_exclude)
+summary(res_rb_soft_Region)
+
+
+res_rb_hard_exclude = lm(avg_vote_score ~ ADL.Score, data = rb_hard_exclude)
+summary(res_rb_hard_exclude)
+```
+
+```{r}
+#What other subsets could we include / variables could be control for?
+
+#Classic controls: Democracy and economic development
+#Not sure what the intuition would be behind either of those in this case though
+
+#What other reasons are there that a nation might condemn Israel?
+
+#States who recognize Palestine vs. Israel
+
+
+#Perhaps we could create a variable "Military relationship with Israel"
+# -1 means they have fought a war alongside Israel or supply Israel with weapons
+# +1 means they have fought a war against Israel or maintain no diplomatic relations with Israel
+#  0 means they have normal diplomatic relations and no military relations with Israel. 
+
+#Data: For data on diplomatic relations, see this website: https://www.gov.il/en/Departments/General/israeli_relations
+#For data on wartime combatants, see this website: https://en.wikipedia.org/wiki/List_of_wars_involving_Israel
+#For data on nations which supply arms to Israel, see this website: https://www.statista.com/statistics/1210645/israel-share-of-arms-imports-by-supplier-country/#:~:text=The%20largest%20share%20of%20arms,exceeded%209.6%20billion%20U.S.%20dollars. 
+#https://www.middleeasteye.net/news/israel-palestine-which-countries-companies-arming - This site, along with Statista.com, say that Israel's arms suppliers are the US, Germany, Italy, the UK, and Canada.
+#The dates vary, but they are up to date, with one website reporting up to in 2019 and the other in 2021. 
+#Statista timeline starts in the year 2000. 
+#Only France and the UK have officially fought wars alongside Israel, according to Wikipedia
+  
+#Based on these, countries that get a -1 are the US, Germany, Italy, Canada, France, and the UK
+#Countries which have fought wars with Israel: Egypt, Iraq, Jordan, Syria, Lebanon, Yemen, Algeria, Morocco, Saudi Arabia
+#Countries which currently have no diplomatic relations wtih Israel: 
+  #Yemen, Tunisia, Qatar, Comoros, Cuba, North Korea, Pakistan, Iraq, Oman, Saudi Arabia, Syria, Somalia, Sudan, Niger, Malaysia, Mali, Mauritania, Libya, Lebanon, Kuwait, Venezuela, Maldives, Djibouti, Brunei, Bangladesh, Afghanistan, Algeria, Iran, Indonesia
+#UAE, Bahrain, and Bhutan also did not have diplomatic relations in 2014. 
+
+#In the dataset, we have the following nations with +1s: 16 MENAs (all except Turkey), Bangladesh, Indonesia, Malaysia, and Venezuela. 
+
+
+
+
+
+
+#Try a set of regressions controlling only for "Friend.or.Foe"
+#coggins_equal %>% View()
+
+res_ce_friendship = lm(avg_vote_score ~ ADL.Score + Friend.or.Foe, data = coggins_equal)
+summary(res_ce_friendship)
+
+res_cb_friendship = lm(avg_vote_score ~ ADL.Score + Friend.or.Foe, data = coggins_binary)
+summary(res_cb_friendship)
+
+res_rs_friendship = lm(avg_vote_score ~ ADL.Score + Friend.or.Foe, data = rmZ_split)
+summary(res_rs_friendship)
+
+res_rb_friendship = lm(avg_vote_score ~ ADL.Score + Friend.or.Foe, data = rmZ_binary)
+summary(res_rb_friendship)
+
+#Plot
+#Use rmZ_split, because the Zs appear to be either non-strategic or negligible
+#Color-code based on Friend.or.Foe
+
+#rmZ_split %>% View()
+
+
+# Create a ggplot - different shapes, better for accessibility
+rs_friendship_plot_cgpt <- ggplot(rmZ_split, aes(x = ADL.Score, y = avg_vote_score, color = Friend.or.Foe, shape = Friend.or.Foe)) +
+  geom_point(size = 3) +
+  labs(x = "Percent of Country's Population Harboring Antisemitic Attitudes", 
+       y = "Propensity to Vote Against Israel at UNGA") +
+  ggtitle("Scatter Plot of Antisemitism Score vs. Average Vote Score") +
+  scale_color_manual(values = c("Friend" = "green", "Foe" = "red", "Neither" = "blue")) +
+  scale_shape_manual(values = c("Friend" = 15, "Foe" = 2, "Neither" = 1)) +
+  theme_minimal()
+rs_friendship_plot_cgpt
+
+
+rs_neither = rmZ_split %>% subset(Friend.or.Foe == "Neither")
+#rs_neither %>% View()
+
+res_rs_neither = lm(avg_vote_score ~ ADL.Score, data = rs_neither)
+#summary(res_rs_neither)
+
+#Plot only the neithers (countries that are neither friend nor foe)
+rs_neither_plot = ggplot(rs_neither, aes(x = ADL.Score, y = avg_vote_score)) +
+  geom_point() +  # Add points to the plot
+  geom_smooth(method = 'lm', se = FALSE) +
+  labs(x = "Percent of Country's Population Harboring Antisemitic Attitudes", y = "Propensity to Vote Against Israel at UNGA") +  # Set axis labels
+  ggtitle("Only Countries that are Neither Friend Nor Foe")  # Set plot title +
+rs_neither_plot
+
+
+
+
+
+#Stargazer table:
+
+#Main results: rmZ_split - use basic, soft regional exclude, and full with Friend.or.Foe control
+
+library(stargazer)
+library(haven)
+
+
+summary(res_rs_basic)
+summary(res_rs_soft_exclude)
+summary(res_rs_friendship)
+summary(res_rs_neither)
+
+stargazer(res_rs_basic, res_rs_soft_exclude, res_rs_friendship, res_rs_neither, type="text", title = "Table 1: Regression Results: Correlation Between Antisemitism and Voting Behavior", align=TRUE,dep.var.labels=c("Propensity to Vote Against Israel"), covariate.labels=c("Antisemitism Score"), out="modelIsrael.html", font.size = "normalsize", omit.stat=c("LL", "ser", "f"), no.space=TRUE)
+
+
+
+```
+
+```{r}
+#Future Directions for research
+
+#1. Disaggregate "Friend.or.Foe" variable into military vs. diplomatic relationship
+#2. Try out other control variables
+#3. Check ADL survey from other years to see if results are similar. If so, add in more resolutions from other years to increase the sample size.
+#4. Ask Chad or somebody who knows stats what other statistical hoops I should jump through in terms of robustness checks, etc. 
+#5. Develop the qualitative part of the research project. 
+
+
+#6. Check if antisemitism score and anti-Israel score (Friend.or.Foe) are statistically correlated.
+
+#Use rmZ_Split:
+
+#Recode Friend.or.Foe as numeric: -1 is pro-Israel, +1 is anti-Israel, 0 is neutral
+rmZ_split_recode = rmZ_split %>% mutate(fof_num = case_when(
+  Friend.or.Foe == "Friend" ~ -1,
+  Friend.or.Foe == "Foe" ~ 1,
+  Friend.or.Foe == "Neither" ~ 0
+))
+
+#I believe regressions can be used to test correlations like this
+res_correlation = lm(fof_num ~ ADL.Score, data = rmZ_split_recode)
+summary(res_correlation)
+
+#Yes, anti-Israel diplomatic/military positions and antisemitism scores are very highly correlated.
+
+
+
+
+```
+
+

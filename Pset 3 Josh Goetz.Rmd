@@ -1,0 +1,400 @@
+---
+title: "Pset 3"
+author: "Josh Goetz"
+date: "2023-11-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls())
+library(dplyr)
+#Import the recoded TAPS dataset from Problem Set 2
+#The recoded dataset as factors was called "life_clean13" in "Pset 2.Rmd"
+#The recoded dataset (not as factors) was called "life_clean12" in "Pset 2.Rmd"
+#Both Pset files are in the 209 folder on my computer
+
+#I saved life_clean13 to the 209 folder as "TAPS_clean.RData"
+
+#Import life_clean13
+#Load TAPS_clean.RData from the RData file
+taps_recoded <- readRDS("TAPS_clean.RData")
+
+#Odd
+#The Data environment says taps_recoded has 1415 observations
+#But when I view it, it actually has 1499
+#Is this why I kept getting that error in Pset 2?
+#Idk, I'm just going to ignore it for now
+
+#Split data into training, validation, and testing sets
+#35%, 25%, and 40% of data
+#Use Michelle's efficient splitting code for this
+#Change data frame name and percentages
+set.seed(123)
+index <- sample(1:3, nrow(taps_recoded), replace = TRUE, prob=c(0.35,0.25,0.40))
+train_dat <- taps_recoded[index==1,]
+valid_dat <- taps_recoded[index==2,]
+test_dat <- taps_recoded[index==3,]
+
+#Very odd
+#I'm getting the same problem
+#When I click on "test_data" (othe the others), the data frame is again 1499 obs. 
+#Particularly strange bc the correct # of rows are displayed in the global environment. 
+#The nrow function gives the correct number of rows (578)
+#So I hope that R is treating it as if it has the correct number of rows
+#Assume that only the display is wrong. 
+
+#Ignore all of that. 
+#The number of observations is correct
+#The indices are just stagnant which is confusing. 
+
+
+
+
+#To make things simpler, we alternatively could drop independents
+#This will give us a binary indicator PID_new, allowing us to use logit
+taps_binary = taps_recoded %>% subset(PID_new == "Democrat" | PID_new == "Republican")
+#Recode as 1s and 0s (1 if Dem, 0 if GOP):
+taps_binary$PID_new = ifelse(taps_binary$PID_new == "Democrat", 1, 0)
+
+#table(taps_binary$PID_new)
+#Unfortunately, taps_binary still has 1499 observations when I click on it
+#Again, nvm.
+set.seed(123)
+index_binary <- sample(1:3, nrow(taps_binary), replace = TRUE, prob=c(0.35,0.25,0.40))
+train_dat_b <- taps_binary[index_binary==1,]
+valid_dat_b <- taps_binary[index_binary==2,]
+test_dat_b <- taps_binary[index_binary==3,]
+
+
+table(train_dat_b$PID_new)
+str(train_dat_b)
+#1: LDA
+
+#Use "the specification you chose in the previous exercise"
+#I assume this means use the best model from Problem Set 2
+#For me, model 4 in Problem Set 2 performed the best, so I will use it here:
+
+#Load library
+library(MASS)
+
+#Use polr function for ordinal logit regressions
+model4 <- polr(as.factor(PID_new) ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data = train_dat, Hess = TRUE)
+summary(model4)
+
+#Use binary dataset for running simpler logit model
+logit_ish = glm(PID_new ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data = train_dat_b)
+summary(logit_ish)
+
+
+#Copied from Michelle:
+# Linear Discriminant Analysis
+#library(MASS) #Already loaded
+
+#Run LDA
+#
+lda.fit=lda(PID_new ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data = train_dat)
+lda.fit
+par(mar=c(4,4,1,1))
+#plot(lda.fit)
+#Run the LDA on the predictions. 
+lda.pred=predict(lda.fit, valid_dat)
+str(lda.pred)
+
+#The output of the predictions is stored in lda.pred$class
+lda.class=lda.pred$class
+
+
+#Take out the LD1, LD2, and prediction values from lda.pred
+#we_need = data.frame(unlist(lda.pred$x), lda.pred$class)
+#Plot the points based on their latent dimensions
+#Color them based on their predicted party affiliation. 
+#plot(we_need$LD1, we_need$LD2, col = we_need$lda.pred.class, main = "LDA with Party Labels Color-Coded")
+
+
+
+# Model accuracy
+mean(lda.class==valid_dat$PID_new)
+table(lda.class,valid_dat$PID_new)
+
+library(caret)  # For confusion matrix 
+confusionMatrix(table(lda.class,valid_dat$PID_new))
+#Basically displays the matrix of correct/incorrect guesses
+#And contains data on accuracy and other stats. 
+
+#Old Plotting code (ignore)
+#lda.data <- cbind(valid_dat, lda.pred$x, lda.pred$class)
+#head(lda.data)
+#plot(lda.data$capacity, lda.data$LD1, pch=16, 
+#     col=c("dodgerblue", "indianred")[(as.numeric(lda.pred$class))])
+
+
+#Use LDA on test dataset
+#Repeat the same process but swap out test for valid
+lda.test=predict(lda.fit, test_dat)
+str(lda.test)
+
+#The output of the predictions is stored in lda.pred$class
+lda.t.class=lda.test$class
+
+
+#Take out the LD1, LD2, and prediction values from lda.pred
+we_test = data.frame(unlist(lda.test$x), lda.test$class)
+#Plot the points based on their latent dimensions
+#Color them based on their predicted party affiliation. 
+#plot(we_test$LD1, we_test$LD2, col = we_test$lda.test.class, main = "LDA with Party Labels Color-Coded")
+
+#Concern: Why so few plotted points?
+#Answer: Lots of overlap of values
+#Try to make points with more overlap bigger
+
+#Calculate density of each point
+#Make plot prettier
+#Add title, axes, fix background. 
+ggplot(we_test, aes(x=LD1, y=LD2, color=lda.test.class)) + 
+  geom_count() +
+  ggtitle("LDA with Party Labels Color-Coded, Weighted by Observation Density")
+
+
+
+#Model accuracy and performance:
+
+# Model accuracy
+mean(lda.t.class==test_dat$PID_new)
+table(lda.t.class,test_dat$PID_new)
+
+library(caret)  # For confusion matrix 
+#Confusion matrix for test dataset
+cmat_lda = confusionMatrix(table(lda.t.class,test_dat$PID_new))
+cmat_lda
+
+#Accuracy: 75.09%
+#95% CI: 71.35% to 78.56%
+
+
+#If still getting errors, try uninstalling and reinstalling R (new version update needed anyway)
+#If not knitting, isolate it section by section. 
+
+```
+
+
+```{r}
+#Support Vector Machines
+
+#2. SVM
+
+#1. Run an SVM with the following attributes
+#Cost value = 10
+#kernel degree = 2
+
+#Same model specification as before
+
+
+
+#2. 
+
+#Run svmfit as michelle did it
+#Enumerate should just be extracting the column of some dataframe or something
+#That gives you all the little vectors that intersect the hyperplane
+#Hyperplane should be a polynomial curve (degree 2)
+#Cross-validate using her tune_out line because it has lots of different costs
+#Best performance is self-explanatory
+#Everything up to this point is with the training set
+#Test on the testing set (ignore the validation set)
+#Last question: Compare SVM to LDA to original logit? Ask Ananya tomorrow
+
+#Load the necessary library
+library (e1071)
+#train_dat$PID_new = as.factor(train_dat$PID_new)
+#View(train_dat$PID_new)
+
+#Same model as before
+#use svm function
+#For polynomial degree 2 kernel, specify that kernel = polynomial and degree = 2
+svmfit = svm(as.numeric(as.factor(PID_new)) ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data=train_dat, kernel ="polynomial", degree= 2, cost =10,
+            scale =FALSE)
+#Enumerate the index of the support vectors of this hyperplane
+svmfit$index
+#length(svmfit$index)
+#Summary of svm
+summary(svmfit)
+
+#Cross validation
+#Method 1: Just vary the cost function, do nothing else
+#set.seed (12)
+#cross_val_1=tune(svm ,PID_new ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48,data=valid_dat ,kernel ="polynomial", degree = 2,
+#              ranges =list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+
+#?svm
+
+#Method 2:
+#Using cross function within svm
+#cross_val_2 = svm(PID_new ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data=train_dat, kernel ="polynomial", degree= 2, cost = 10, cross = 5)
+#summary(cross_val_2)
+
+
+#Method 3: Both
+#Vary k and cost:
+#I think this requires both the e1071 and caret libraries
+#Use validation set, as specified
+
+
+#Recode independents as Republicans or Democrats
+#Because tune can't handle factors that well
+#Code Independents as Democrats #Bernie
+taps_ind_r_dem = taps_recoded %>% mutate(PID_new = case_when(PID_new == "Independent" ~ "Democrat", 
+                                                   TRUE ~ PID_new))
+
+#Break into training, testing, and validation as done above
+set.seed(123)
+index <- sample(1:3, nrow(taps_ind_r_dem), replace = TRUE, prob=c(0.35,0.25,0.40))
+train_ird <- taps_ind_r_dem[index==1,]
+valid_ird <- taps_ind_r_dem[index==2,]
+test_ird <- taps_ind_r_dem[index==3,]
+
+#Some nonsense to check what was going on with the error I was getting
+#table(as.numeric(valid_ird$PID_new), useNA = "ifany")
+#class(valid_ird$PID_new)
+#table(as.numeric(as.factor((valid_ird$ISSUESA7S48))), useNA = "ifany")
+#table(as.numeric(as.factor((valid_ird$ISSUESA8S48))), useNA = "ifany")
+#table(as.numeric(as.factor((valid_ird$ISSUESA9S48))), useNA = "ifany")
+#class(valid_ird$ISSUESA7S48)
+
+#Cross validation
+#Try k = 10 (ten-fold cross validation), 7 different costs
+#Note: The ISSUES variables are initially character
+#Doing as.numeric() by itself turns them into NAs
+#So here we have to do as.factor first to turn them into factors
+#And then turn them into numbers. 
+cross_val_3 <- tune(svm, 
+                    as.numeric(as.factor(PID_new)) ~ 
+                      as.numeric(as.factor(ISSUESA7S48)) + 
+                      as.numeric(as.factor(ISSUESA8S48)) + 
+                      as.numeric(as.factor(ISSUESA9S48)),
+                    data = valid_ird, 
+                    kernel = "polynomial", 
+                    degree = 2, 
+                    ranges = list(cost = c(0.001,0.01,0.1,1,5,10,100)),
+                    cross = 10)
+
+#Got a bunch of warnings. Ignored all of them. 
+
+#Summary of cross-validation
+summary(cross_val_3)
+
+
+#Select the best model from the cross-validation. 
+bestmod = cross_val_3$best.model
+summary(bestmod)
+
+#Print the parameters from the best model
+print(summary(bestmod))
+#Note: This also prints some other junk
+#The parameters are written below for the grader's convenience:
+
+#List of Parameters:
+#SVM-Type: eps-regression
+#SVM-Kernel: polynomial
+#cost: 0.01
+#degree: 2
+#gamma: 0.333333
+#coef.0: 0
+#epsilon: 0.1
+
+
+
+#5. Use the model to predict values in your test set. Record diagnosis of its performance
+
+
+#Recode the PID to be as.numeric
+test_ird$PID_new <- as.numeric(as.factor(test_ird$PID_new))
+
+
+#Predict fucntion didn't work
+#ypred=predict(bestmod, test_ird)
+#Instead, hard-code in the best model
+
+
+svmfit_pred = svm(as.numeric(as.factor(PID_new)) ~ 
+                      as.numeric(as.factor(ISSUESA7S48)) + 
+                      as.numeric(as.factor(ISSUESA8S48)) + 
+                      as.numeric(as.factor(ISSUESA9S48)), 
+                    kernel = "polynomial", 
+                    degree = 2, 
+                    cost = 0.1, gamma = 0.3333333, epsilon = 0.1, coef.0 = 0,
+                  dat = test_ird)
+
+
+#Print the support vectors and their indices
+#print(svmfit_pred$SV)
+#Print the predicted values
+#print(svmfit_pred$fitted)
+
+#Round the predictions to the nearest whole number
+preds = round(svmfit_pred$fitted)
+
+#table(predict = preds , truth = test_ird$PID_new)
+
+
+
+
+
+
+orb_of_confusion = confusionMatrix(table(predict = preds ,  truth = test_ird$PID_new))
+orb_of_confusion
+
+#Report diagnostics of best model
+diagnostics_svm_best = orb_of_confusion$overall
+diagnostics_svm_best
+
+diagnostics_lda = cmat_lda$overall
+diagnostics_lda
+
+
+
+
+#6. Create a table comparing the diagnosis of the three approaches you used in the sub-
+#   sections above. Which model does the best job at explaining party ID? Discuss.
+
+#Compare diagnostics from three models
+#SVM specified by Michelle (svmfit)
+#SVM best model
+#LDA
+
+svmfit_michelle_pred = svm(PID_new ~ ISSUESA7S48 + ISSUESA8S48 + ISSUESA9S48, data=test_ird, kernel ="polynomial", degree= 2, cost =10,
+            scale =FALSE)
+
+preds_michelle = round(svmfit_michelle_pred$fitted)
+
+table(predict = preds_michelle , truth = test_ird$PID_new)
+
+
+
+ooc_michelle = confusionMatrix(table(predict = preds_michelle ,  truth = test_ird$PID_new))
+ooc_michelle
+
+diagnostics_svm_michelle = ooc_michelle$overall
+diagnostics_svm_michelle
+
+#Combine diagnostics into a single object
+diag = cbind(diagnostics_lda, diagnostics_svm_michelle, diagnostics_svm_best)
+
+
+#Print the diagnostics for all three models
+print(diag)
+
+
+#Discussion of results: 
+#The original SVM model has the highest accuracy (79%)
+#"Best" SVM model has only a 67% accuracy
+#LDA has a 75% accuracy
+#Odd that best SVM has lowest accuracy
+#Conclusion: SVM not very good at prediction
+#None of these methods yields a very good accuracy
+#Takeaway: Need better models (e.g. more predictor variables)
+#Or we need better methods (maybe LDA and SVM both insufficient)
+#Maybe both
+```

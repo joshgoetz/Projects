@@ -1,0 +1,3240 @@
+---
+title: "UNSC Antisemitism"
+author: "Josh Goetz"
+date: "2023-11-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+#Attempt to read Haaretz article through paywall
+#Unsuccessful
+#My guess is that the web scarper is too slow
+#The blocker probably pops up before the scraper gets access to the data on the page
+#Need a faster computer or a better programming language (e.g. Python)
+#Or better code
+#Or maybe something else is the issue. 
+
+
+#Big Loop attempt:
+
+#Load libraries:
+library(RSelenium) #Use for webscraping
+library(wdman) #Use to determine available versions of Chrome
+library(netstat) #Use for free_port function
+library(rvest) #Seems important
+library(httr)  #Necessary for reading html?
+library(stringr) #Use for substring function (str_sub)
+library(dplyr) #Use everyday like an umbrella in Seattle
+
+#Base URL
+url <- "https://www.haaretz.com/israel-news/2021-10-30/ty-article/.premium/israels-un-envoy-tears-up-human-rights-council-report-at-general-assembly/0000017f-dbae-df9c-a17f-ffbe15210000"
+
+#Initialize remote driver and open it
+remote_driver = rsDriver(browser = "firefox", chromever = NULL, port = free_port())
+remDr = remote_driver$client
+remDr$open()
+
+remDr$navigate(url)
+
+
+
+#Get html code of specific page of results
+html_source <- remDr$getPageSource()
+#read html code
+target_page <- read_html(html_source[[1]])
+target_page
+
+#Use "Inspect" to look at the html code on the page
+#Find the bin that contains the body of the article in the html 
+stories <- target_page %>% html_nodes("p.sm.sn.lb.so.sp.sq")
+
+#Print the html text in the node
+stories %>% html_text()
+print(stories[1])
+
+#sm sn lb so sp sq
+
+#Fail
+
+```
+
+
+
+
+```{r}
+
+#Part 1: UN Security Council Resolutions
+
+
+#Try to scrape the UN Website for the titles of UNSC resolutions dating back as far as I can go
+
+#Remove stuff
+rm(list=ls())
+
+
+#Big Loop attempt:
+
+#Load libraries:
+library(RSelenium) #Use for webscraping
+library(wdman) #Use to determine available versions of Chrome
+library(netstat) #Use for free_port function
+library(rvest) #Seems important
+#rvest necessary for reading html content (e.g. tables)
+library(httr)  #Necessary for reading html?
+library(stringr) #Use for substring function (str_sub)
+library(dplyr) #Use everyday like an umbrella in Seattle
+
+#Base URL
+url <- "https://www.un.org/securitycouncil/content/resolutions-0"
+
+
+#Initialize remote driver and open it
+remote_driver = rsDriver(browser = "firefox", chromever = NULL, port = free_port())
+remDr = remote_driver$client
+remDr$open()
+
+#Initialize unsc_adopted and df
+df = NULL
+unsc_adopted = NULL
+
+#Wrap the entire loop in the invisible function to prevent output
+invisible({
+  #Scrape the data for every year in desired range
+  #Ideally do 1992 (post-Cold War is a reasonable start point)
+  #Here I do 2000 because I was running into an error when doing earlier. 
+  #2000 also works because it's an even number and it pretty much encompasses modern era. 
+  for (i in 2000:2023) {
+    #For pages 1 to 10, append the suffix to the base url
+    #Also need to remove the end of the base url
+    #Example: Year 2023: https://www.un.org/securitycouncil/content/resolutions-adopted-security-council-2023
+    #For page 1, the url is the base url
+    suffix_i = paste0("adopted-security-council-", i)
+    url_full = gsub("0", suffix_i, url)
+    print(url_full)
+    
+    #Navigate to the exact page (corresponding to the year)
+    remDr$navigate(url_full)
+    
+    #Get html code of specific page of results
+    html_source <- remDr$getPageSource()
+    #read html code
+    target_page <- read_html(html_source[[1]])
+    target_page
+    
+    #Access the data table on each page
+    table = target_page %>% html_table(fill = TRUE)
+    
+    #Save the table as a data frame
+    
+    #Issue: format is different for resolutions before 2016
+    #table is accessed via table[[2]] instead of table
+    
+    #Also rename variables
+    if (i >= 2016){
+      df <- as.data.frame(table)
+      new_names = c("resolution", "date_adopted", "topic")
+      names(df) = new_names
+    } else{
+      df <- as.data.frame(table[[2]])
+      
+      if(i >= 2014){
+        new_names = c("resolution", "date_adopted", "topic")
+        names(df) = new_names
+      } else {
+        new_names = c("resolution", "topic")
+        names(df) = new_names
+        df$date_adopted = NA
+        #Re-order columns using the select function
+        df = df %>% select(resolution, date_adopted, topic)
+      }
+    }
+    
+    
+    #Add a column to the data frame for the year
+    #Note: The second column (date of adoption) only exists from 2014 on.
+    df$year = i
+    
+  
+    #Combine all rows together into master data frame
+    #Use "invisible" to ensure output is not displayed
+     if (exists("unsc_adopted")) {
+      unsc_adopted <- bind_rows(unsc_adopted, df)
+    } else {
+      unsc_adopted <- df
+    }
+  }
+
+})
+
+#Compile into a huge block of text talking about all topics
+all_topics = paste(unsc_adopted$topic, collapse = " ")
+#print(all_topics)
+#copy block of text into clipboard
+writeClipboard(all_topics)
+
+
+#Use the stringr package to figure out how many times each country is mentioned
+#Term frequency analysis
+
+
+library(stringr)
+
+
+#Vector of country names
+#Start with the full list of UN Member states (obtained in format from ChatGPT)
+
+
+#Edits:
+
+#Double-check the list of countries to make sure ChatGPT names match UN names
+#Include "Palestin-"
+
+countries <- c(
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
+  "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+  "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil",
+  "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
+  "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica",
+  "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+  "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada",
+  "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+  "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+  "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia",
+  "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar",
+  "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico",
+  "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia",
+  "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway",
+  "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines",
+  "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia",
+  "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia",
+  "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands",
+  "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland",
+  "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago",
+  "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom",
+  "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia",
+  "Zimbabwe"
+)
+
+
+
+
+
+#Show results, first just by country
+
+# Create an empty data frame to store the results
+country_frequency <- data.frame(Country = character(), Frequency = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each country and count its occurrences
+for (country in countries) {
+  # Count occurrences of the country in the text
+  count <- str_count(tolower(all_topics), tolower(country))
+  
+  # Append the result to the data frame
+  country_frequency <- rbind(country_frequency, data.frame(Country = country, Frequency = count, stringsAsFactors = FALSE))
+}
+
+# Sort in descending order of Frequency
+sorted_country_frequency <- country_frequency %>%
+  arrange(desc(Frequency))
+
+# Display the sorted data frame
+print(sorted_country_frequency)
+
+#Results are interesting
+#Surprisingly few nations are mentioned (only 39)
+#Almost all are very weak states, most politically irrelevant on the global scale
+#Most probably have no P5-backer
+#Some P5 nations are mentioned, but it appears that's noise in the data
+#They are listed deep in the description; resolution probably not about them
+#Should verify this though by skimming/reading resolution
+
+#This is almost assuredly an undercount
+#Some countries may go by names that are different than those provided by Chat-GPT.
+#But that just means the effect / results are probably stronger than they appear. 
+
+
+#Israel not mentioned at all (0 times)
+
+
+
+
+
+
+#Repeat process for Israel-related terms
+
+
+#Then add any possibly relevant terms to Israel,
+#Such as "Palestinian", "Middle East", "Gaza", "West Bank", "Occupied Territories", "Jerusalem", etc. 
+#Not that the word "Palestine" does not appear. 
+israel_terms <- c(
+  "Palestinian", "West Bank", "Gaza", "Jerusalem", "Golan", 
+  "Occupied Territories", "Middle East", "Two-State Solution", 
+  "Settlements", "Refugees", "Hamas", 
+  "Fatah", "Intifada", "Peace Process", "UNRWA", "Jerusalem Embassy", 
+  "Security Barrier", "Pre-1967 Borders", "Security Resolutions", "IDF", "Israeli"
+)
+
+israel_country_frequency <- data.frame(Country = character(), Frequency = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each country and count its occurrences
+for (country in israel_terms) {
+  # Count occurrences of the country in the text
+  count <- str_count(tolower(all_topics), tolower(country))
+  
+  # Append the result to the data frame
+  israel_country_frequency <- rbind(israel_country_frequency, data.frame(Country = country, Frequency = count, stringsAsFactors = FALSE))
+}
+
+# Sort in descending order of Frequency
+sorted_icf <- israel_country_frequency %>%
+  arrange(desc(Frequency))
+
+# Display the sorted data frame
+print(sorted_icf)
+
+
+#Results:
+#"Middle East" mentioned 146 times
+#"Palestinian" mentioned 11 times
+#No other term mentioned at all. 
+
+term_count_combined = rbind(sorted_country_frequency, sorted_icf)
+sorted_combined = term_count_combined %>%
+  arrange(desc(Frequency))
+
+sum(term_count_combined$Frequency)
+
+#Interesting results
+
+#Very ironic point that Timor-Leste is actually mentioned more times than "Palestinian"
+#@Jack-Donnelly. Make sure to mention this in the paper
+#"Timor" is actually mentioned 19 times while "Timor-Leste" is only mentioned 13 times
+#So this is evidence of undercounting by me
+#Basically, I cast a wide net for Israel/Palestine and a narrow net for everyone else
+#Made it as easy as possible to detect bias
+#Didn't really find any evidence of it, unless every resolution regarding the Middle East has to do with Israel. 
+#"Palestinian" is 27th in the combined list
+#Meaning there are 25 countries that are more frequently the topic of adopted UNSC resolutions than Israel/Palestine
+#"Palestinian" mentioned as frequently as Angola
+#Slightly more than Syria, Croatia, Chad, and Yemen
+#Slightly less than Angola, Timor-Leste, Colombia, and Guinea-Bissau
+
+
+
+
+
+#Next steps: Find the resolutions that mention Middle East and download their PDFs. 
+#Then just Ctrl+F all of them manually for the terms "Israel" and "Palestin" (not Palestine)
+
+#Or, ask Connor/Michelle/internet if R can read the text of pdfs directly and if that's easy. 
+#Update: it is easy - see below code. 
+
+#I think this is the approach:
+#Scrape the links to the pdfs of all of the resolutions 
+#Append the links as a row of the data frame
+#Subset the data frame to only look at the resolutions mentioning the Middle East
+#In R, build a function that extracts the text from PDFs (given their links)
+#The function will retun the text from the link
+#You can then search the text like you did above
+#See Chat-GPT for relevant packages / structure. 
+
+
+#Does the library of country names capture the overall topics well?
+#The combined frequency list contains 1394 observations
+#And the dataset I'm currently using contains 1422 Resolutions
+#So probably yes
+#Because a visual inspection tells us that most resolutions mention 1 country
+#Some mention 2 though, so we are probably missing 100+ resolutions in the frequency count
+#But I think that is an acceptable amount
+#I have no reason to think that the missingness is not random
+#Or at least not random in a way that would exclude Israel-related observations more often than others
+#The bias (if it exists) is probably the other way, which is fine
+#This would make the argument stronger. 
+
+
+
+#Plan (2/12/24):
+#First, see if I can just use word search on UNSC website to search body of resolutions:
+#If so, then search it using same method as above
+#Maybe try that new web scraping tool if possible (have it automate the search process)
+#If this works, I will have a source of all mentions for each country. 
+#This should be okay. Some will not be accusing that country, but that is alright.
+#Supplementary to the analysis above (title should include accused country, but verify this)
+
+#If this doesn't work, read the pdfs of all resolutions and count total mentions of Israel. 
+#If this is still lower than most countries' title mentions, I am done for sure
+#If it is higher, then need to expand search
+
+#First read through a few resolutions that mention the Middle East
+#Make sure that Israel is mentioned usually as an aggressor, not as a victim. 
+#If this is not the case, might need to do by hand. 
+
+#If it is, download all pdfs of all adopted resolutions.
+#And search through each of them for number of times a country is mentioned.
+#Include all Israel-related terms in the search terms list, but only one for every other country
+#Make sure the names for every other country are the names actually used by the UN. 
+#Sum all Israel-related terms into a single number. 
+#If there are countries (especially low-profile countries) higher than Israel, we are done.
+#Also try just looking at Israel as a term just like every other country.
+#These results are equally valid and could serve as a robustness check. 
+
+```
+
+
+
+```{r}
+
+#Part 2: International NGOs - does their focus mirror that of the UN?
+
+
+#Next step is analyzing the annual reports of Amnesty International and Human Rights Watch
+
+#Ideally, this will involve word frequency analysis of each of their annual reports since 2000.
+
+#To do this, we need to download all of their reports
+#Ideally do this with webscraping, but if push comes to shove I can just manually save all the pdfs to a folder and then have R read them and analyze them from there (b/c I'm not sure how the downloading process works).
+
+#But let's try it out
+#First, let's do Amnesty International. 
+
+#
+
+
+#Try reading in a pdf
+
+# Install and load the pdftools package
+#install.packages("pdftools")
+library(pdftools)
+library(stringr)
+library(dplyr)
+
+# Read the PDF file
+sample_report = paste(pdf_text("C:/Users/jag11/Downloads/Amnesty Rport random year.pdf"), collapse = " ")
+#sample_report
+
+#Check to make sure it got the whole thing
+#R stopped printing at some point "the public"
+#Try searching for "Financial Control", which only appears once in the document after the cut point
+
+#Note: Words that are bisected by a line break will not be captured
+#I think this is fine, as this should be completely random
+#Only possible bias is that it should under-count countries with long names
+#Israel's name is short, so there should be no issues here
+#Bias in opposite direction if any at all. 
+
+countries_amnesty <- c(
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
+  "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+  "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil",
+  "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
+  "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica",
+  "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+  "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada",
+  "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+  "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+  "Kenya", "Kiribati", "North Korea", "South Korea", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia",
+  "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar",
+  "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico",
+  "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia",
+  "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway",
+  "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines",
+  "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia",
+  "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia",
+  "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands",
+  "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland",
+  "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago",
+  "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom",
+  "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia",
+  "Zimbabwe"
+)
+
+countries_and_demonyms <- c(
+  "Afghanistan", "Afghan", "Albania", "Albanian", "Algeria", "Algerian", "Andorra", "Andorran", "Angola", "Angolan",
+  "Antigua and Barbuda", "Antiguan", "Argentina", "Argentinian", "Armenia", "Armenian", "Australia", "Australian", "Austria", "Austrian",
+  "Azerbaijan", "Azerbaijani", "Bahamas", "Bahamian", "Bahrain", "Bahraini", "Bangladesh", "Bangladeshi", "Barbados", "Barbadian",
+  "Belarus", "Belarusian", "Belgium", "Belgian", "Belize", "Belizean", "Benin", "Beninese", "Bhutan", "Bhutanese",
+  "Bolivia", "Bolivian", "Bosnia and Herzegovina", "Bosnian", "Botswana", "Botswanan", "Brazil", "Brazilian", "Brunei", "Bruneian",
+  "Bulgaria", "Bulgarian", "Burkina Faso", "Burkinabe", "Burundi", "Burundian", "Cabo Verde", "Cape Verdean", "Cambodia", "Cambodian",
+  "Cameroon", "Cameroonian", "Canada", "Canadian", "Central African Republic", "Central African", "Chad", "Chadian", "Chile", "Chilean",
+  "China", "Chinese", "Colombia", "Colombian", "Comoros", "Comorian", "Congo", "Congolese", "Costa Rica", "Costa Rican",
+  "Croatia", "Croatian", "Cuba", "Cuban", "Cyprus", "Cypriot", "Czech Republic", "Czech", "Denmark", "Danish",
+  "Djibouti", "Djiboutian", "Dominica", "Dominican Republic", "Dominican", "Ecuador", "Ecuadorean", "Egypt", "Egyptian", "El Salvador", "Salvadoran",
+  "Equatorial Guinea", "Equatorial Guinean", "Eritrea", "Eritrean", "Estonia", "Estonian", "Eswatini", "Swazi", "Ethiopia", "Ethiopian",
+  "Fiji", "Fijian", "Finland", "Finnish", "France", "French", "Gabon", "Gabonese", "Gambia", "Gambian",
+  "Georgia", "Georgian", "Germany", "German", "Ghana", "Ghanaian", "Greece", "Greek", "Grenada", "Grenadian",
+  "Guatemala", "Guatemalan", "Guinea", "Guinean", "Guinea-Bissau", "Bissau-Guinean", "Guyana", "Guyanese", "Haiti", "Haitian",
+  "Honduras", "Honduran", "Hungary", "Hungarian", "Iceland", "Icelander", "India", "Indian", "Indonesia", "Indonesian",
+  "Iran", "Iranian", "Iraq", "Iraqi", "Ireland", "Irish", "Israel", "Israeli", "Italy", "Italian",
+  "Jamaica", "Jamaican", "Japan", "Japanese", "Jordan", "Jordanian", "Kazakhstan", "Kazakh", "Kenya", "Kenyan",
+  "Kiribati", "Kiribatian", "North Korea", "North Korean", "South Korea", "South Korean", "Kosovo", "Kosovar", "Kuwait", "Kuwaiti",
+  "Kyrgyzstan", "Kyrgyz", "Laos", "Laotian", "Latvia", "Latvian", "Lebanon", "Lebanese", "Lesotho", "Mosotho",
+  "Liberia", "Liberian", "Libya", "Libyan", "Liechtenstein", "Liechtensteiner", "Lithuania", "Lithuanian", "Luxembourg", "Luxembourger",
+  "Madagascar", "Malagasy", "Malawi", "Malawian", "Malaysia", "Malaysian", "Maldives", "Maldivian", "Mali", "Malian",
+  "Malta", "Maltese", "Marshall Islands", "Marshallese", "Mauritania", "Mauritanian", "Mauritius", "Mauritian", "Mexico", "Mexican",
+  "Micronesia", "Micronesian", "Moldova", "Moldovan", "Monaco", "Monacan", "Mongolia", "Mongolian", "Montenegro", "Montenegrin",
+  "Morocco", "Moroccan", "Mozambique", "Mozambican", "Myanmar", "Burmese", "Namibia", "Namibian", "Nauru", "Nauruan",
+  "Nepal", "Nepali", "Netherlands", "Dutch", "New Zealand", "New Zealander", "Nicaragua", "Nicaraguan", "Niger", "Nigerien",
+  "Nigeria", "Nigerian", "North Macedonia", "Macedonian", "Norway", "Norwegian", "Oman", "Omani", "Pakistan", "Pakistani",
+  "Palau", "Palauan", "Palestine", "Palestinian", "Panama", "Panamanian", "Papua New Guinea", "Papua New Guinean", "Paraguay", "Paraguayan",
+  "Peru", "Peruvian", "Philippines", "Filipino", "Poland", "Polish", "Portugal", "Portuguese", "Qatar", "Qatari",
+  "Romania", "Romanian", "Russia", "Russian", "Rwanda", "Rwandan", "Saint Kitts and Nevis", "Kittitian/Nevisian", "Saint Lucia", "Saint Lucian",
+  "Saint Vincent and the Grenadines", "Vincentian", "Samoa", "Samoan", "San Marino", "Sammarinese", "Sao Tome and Principe", "Sao Tomean/Principean", "Saudi Arabia", "Saudi",
+  "Senegal", "Senegalese", "Serbia", "Serbian", "Seychelles", "Seychellois", "Sierra Leone", "Sierra Leonean", "Singapore", "Singaporean",
+  "Slovakia", "Slovak", "Slovenia", "Slovenian", "Solomon Islands", "Solomon Islander", "Somalia", "Somali", "South Africa", "South African",
+  "South Sudan", "South Sudanese", "Spain", "Spanish", "Sri Lanka", "Sri Lankan", "Sudan", "Sudanese", "Suriname", "Surinamese",
+  "Sweden", "Swedish", "Switzerland", "Swiss", "Syria", "Syrian", "Taiwan", "Taiwanese", "Tajikistan", "Tajik", "Tanzania", "Tanzanian",
+  "Thailand", "Thai", "Timor-Leste", "Timorese", "Togo", "Togolese", "Tonga", "Tongan", "Trinidad and Tobago", "Trinidadian/Tobagonian",
+  "Tunisia", "Tunisian", "Turkey", "Turkish", "Turkmenistan", "Turkmen", "Tuvalu", "Tuvaluan", "Uganda", "Ugandan", "Ukraine", "Ukrainian",
+  "United Arab Emirates", "Emirati", "United Kingdom", "British", "United States", "American", "Uruguay", "Uruguayan", "Uzbekistan", "Uzbek", "Vanuatu", "Vanuatuan",
+  "Vatican City", "Vatican", "Venezuela", "Venezuelan", "Vietnam", "Vietnamese", "Yemen", "Yemeni", "Zambia", "Zambian", "Zimbabwe", "Zimbabwean"
+)
+
+
+# Initialize an empty list to store data frames
+country_fq_amnesty_list <- lapply(countries_amnesty, function(country) {
+  # Count occurrences of the country in the text
+  #count_amnesty <- str_count(tolower(sample_report), tolower(country))
+  count_amnesty <- str_count(sample_report, country)
+  
+  # Create a data frame for the current country
+  data.frame(Country = country, Frequency = count_amnesty, stringsAsFactors = FALSE)
+})
+
+# Combine the list of data frames into a single data frame
+country_fq_amnesty <- do.call(rbind, country_fq_amnesty_list)
+
+# Sort in descending order of Frequency
+sorted_country_fq_amnesty <- country_fq_amnesty %>%
+  arrange(desc(Frequency))
+
+# Display the sorted data frame
+print(sorted_country_fq_amnesty)
+
+#A quick spot check verifies that these numbers are correct
+#Using tolower()
+#Ctrl+F of the report pdf
+#Israel: 57 mentions (57)
+#Albania 38 / 38
+#Mali: 75 / 74 #Issue: This includes mentions of soMALIa. 
+#For Mali, subtract "Somalia" count from Mali" count
+#Tanzania: 19 / 19
+#Sudan: 40 / 40
+#Myanmar: 23 / 23
+
+#Not using tolower() (better method):
+#Results are similar, but all of these frequencies are lower. 
+
+
+#Mali and Oman appear inside the names Somalia and Romania. 
+#So make sure to account for that. 
+
+#sorted_country_fq_amnesty = sorted_country_fq_amnesty %>% mutate(mentions = case_when(Country == "Mali" ~ ))
+
+
+
+# Find the indices for "Mali" and "Somalia"
+index_mali <- which(sorted_country_fq_amnesty$Country == "Mali")
+index_somalia <- which(sorted_country_fq_amnesty$Country == "Somalia")
+
+index_mali
+index_somalia
+
+# Subtract the frequency of "Somalia" from "Mali"
+sorted_country_fq_amnesty$Frequency[index_mali] <- 
+  sorted_country_fq_amnesty$Frequency[index_mali] - 
+  sorted_country_fq_amnesty$Frequency[index_somalia]
+
+
+index_oman <- which(sorted_country_fq_amnesty$Country == "Oman")
+index_romania <- which(sorted_country_fq_amnesty$Country == "Romania")
+
+# Subtract the frequency of "Romania" from "Oman"
+sorted_country_fq_amnesty$Frequency[index_oman] <- 
+  sorted_country_fq_amnesty$Frequency[index_oman] - 
+  sorted_country_fq_amnesty$Frequency[index_romania]
+
+
+# Print the updated dataframe
+
+sorted_country_fq_amnesty <- sorted_country_fq_amnesty %>%
+  arrange(desc(Frequency))
+
+print(sorted_country_fq_amnesty)
+
+
+#Issues:
+#1. Countries with short names (e.g. Iran, Mali) could conceivably appear in unrelated words
+#E.g. "Oman" appears in "woman" and "Romania". 
+#"Mali" appears in the word "formality", "malicious", and in "Somalia". 
+#Spot check this with Ctrl+F. 
+#Probably can ignore this issue, but if it happens a lot I could remove these countries
+#Alternatively, could regress name length on mentions.
+#If no significant correlation, probably no problem
+#If significant correlation, might need to adjust for this. 
+#2: The word "India" appears many times in the word "Indian", which is used to refer to indigenous communities outside of India
+#This is the biggest issue
+#Solution: Could just remove India
+#It's not a pariah state and it doesn't really matter if I capture all countries
+#Alternatively, create a separate count for the word "Indian" and subtract this out
+#This will end up undercounting "India" but that's probably fine. 
+#3. Are Israel and Palestine always mentioned together?
+#If so, ignore mentions of Palestine
+#If not, add mentions of Palestine to mentions of Israel to create a combined count
+#Issue with this: Might overcount Israel
+#Bc double-counting options not granted to other countries (e.g. Burma/Myanmar, Darfur/Sudan)
+
+#3. Undercounts countries whose demonyms differ from their name
+#E.g. "Israeli" contains the word "Israel". But "Chinese" doesn't contain the word "China". 
+#There are 26 mentions of "Chinese" and 53 mentions of "China" or "CHINA" in the report
+#This is kind of a lot
+
+#Solution: We could add a second dictionary of demonymns
+#Combine name count and demonym count into one
+
+#Are there any other words besides demonyms and country names that should be counted?
+#Capitals/regions? Probably not
+#Words like "Sino" or "Luso"? Probably don't occur often. No occurences in 1990 report
+
+
+
+
+#Is lowercase better than standard?
+#If we don't use "tolower" then the numbers change
+#But they are still basically accurate
+#R finds 47 mentions of China
+#But there are really 53. 
+#It misses mentions of "CHINA" but gets all the "China" mentions.
+#Double-check: Check that this is the case with other countries
+#Double-check: Check to make sure the formatting doesn't change across years
+#i.e. do later reports capitalize country names all the time? Problaby not, but should check. 
+
+
+
+#Other (slower) way - use if getting bugs
+#index_mali <- which(sorted_country_fq_amnesty$Country == "Mali")
+#index_somalia <- which(sorted_country_fq_amnesty$Country == "Somalia")
+
+# Subtract the frequency of "Somalia" from "Mali"
+#adjusted_frequency <- sorted_country_fq_amnesty$Frequency[index_mali] - 
+#                      sorted_country_fq_amnesty$Frequency[index_somalia]
+
+# Create a new row with the adjusted count for "Mali"
+#new_row <- data.frame(Country = "Adjusted Mali", Frequency = adjusted_frequency)
+
+# Add the new row to the dataframe
+#sorted_country_fq_amnesty <- rbind(sorted_country_fq_amnesty, new_row)
+
+
+
+
+
+
+
+
+#Should we combine mentions of Israel and Palestine?
+#Probably just use Israel
+#Since I am only using the perpetrating country name for all the other countries
+
+
+
+#Ultimately, we want to normalize by / regress on two possible explanatory variables
+#1. News coverage of Israel - Google Trends or # of NYT articles
+#2. Death count of the conflict. 
+#Might have to normalize by overall death count for each year, or overall mentions. 
+#E.g. 2020 will have few mentions of any conflict, since most media would be focused on COVID. 
+#So in 2020, we should see a decrease in mentions of Israel
+#But this doesn't indicate a decrease in Israel's prominence vs. other pariah states.
+#Since Amnesty only focused on pariah states, relative prominence is what matters
+#Relative vs. absolute importance (#3 and #4)
+
+
+
+```
+
+
+
+```{r}
+#Try downloading all reports using rvest
+
+# Install and load the required packages
+#install.packages("rvest")
+library(rvest)
+
+# URL of the primary webpage
+url_amnesty <- "https://www.amnesty.org/en/annual-report-archive/"
+
+# Read the HTML content of the webpage
+webpage <- read_html(url_amnesty)
+
+
+#The issue here is that the links to the pdfs are not on the primary page
+#Instead they are on a secondary page
+#The secondary page is linked on the "Download" button on the primary page
+
+# Extract links to download (secondary) pages
+download_page_links <- webpage %>%
+  #This tells us to find nodes that contain an anchor tag <a>
+  #<a> defines a hyperlink
+  #For this website, I inspected the html code and found that...
+  #All of the hyperlinks to secondary pages end in /en/
+  #Except one of them ends in en-2/. 
+  #So we account for both cases
+  html_nodes("a[href$='/en/'], a[href$='en-2/']") %>%
+  html_attr("href")
+
+#We print the results first to make sure we got all the necessary links
+#We also want to make sure we didn't pick up any extra links. 
+print(download_page_links)
+
+#Did we get them all?
+#Not quite.
+#There should be 62 but there are only 61
+#Also, two links are extra, so we really only have 59.
+#We need to get rid of the extras and look for the three missing ones.
+#Which are missing?
+#2019
+#2016
+#2014
+
+#Why?
+#2019 report was a series of regional reports
+#2016 link ends in a different pattern (fixed above in html_nodes line)
+#2014 Amnesty did not publish a report covering 2013. 
+
+#Note: The year in the hyperlink is actually a year after what is covered.
+#E.g. "2014/2015 Annual Report covers 2014, but the link says 2015.
+#The link to the report covering 1961 says 1962
+#B/c it was presumably published in 1962. 
+
+#After fixing it, we now have
+#the links to the pages for 
+#all reports except the ones that cover 2013 and 2019
+#Because Amnesty did not publish annual reports in those years. 
+
+#If we really wanted to, we could combine all the 2019 regional reports
+#into a single pdf, but I don't think this would be worth the time.
+
+#So we don't need to find any more links
+#But we still need to get rid of the extra links
+#Let's do that now.
+#Remove the first two links because they are useless:
+
+secondary_links = download_page_links[3:62]
+print(secondary_links)
+
+#Now we have all the secondary links we need!
+#Now let's download the PDFs from these links.
+
+#Initialize counter
+#This one is just for printing purposes. 
+ii = 1
+
+
+#Also initialize file year counter at 2023
+#Then have it go back one year each time through the loop
+file_year = 2023
+
+# Download PDFs from each download page
+for (download_page_link in secondary_links) {
+  #Check to make sure all links contain "https://" If not, add it to beginning
+  #This accounts for the case where you somehow have incomplete links
+  download_page_url <- ifelse(startsWith(download_page_link, "http"), download_page_link, paste0("https://", download_page_link))
+  
+  # Read the HTML content of the download page
+  download_page <- read_html(download_page_url)
+  
+  # Extract the download link from the download page
+  #Here, the key pattern is that the link to the pdf should end in ".pdf"
+  #Otherwise, something is wrong.
+  
+  #Here, we don't have a and href
+  #Instead, for some reason we have "object" instead of "a"
+  #And "data" instead of "href"
+  #So just substitute them
+  pdf_link <- download_page %>%
+    html_nodes("object[data$='.pdf']") %>%
+    html_attr("data")
+  
+  
+  
+  #Before running the download code, check to make sure the pdf links are right. 
+  #Also print a counter
+  #print(ii)
+  #print(pdf_link)
+  
+  
+  #Increment counter
+  ii = ii + 1
+  
+  
+  #Looks good! Let's move on to downloading
+  
+  # Download the PDF
+  #Check to make sure pdf actually exists
+  #If not, print an error message.
+  
+  
+  #I would like to change the filenames
+  #I want them to read "Amnesty Report [Year]"
+  #Thankfully, the loop goes in inverse chronological order
+  #So we can simply use a counter to make that happen
+  
+  
+  
+  save_folder <- "C:/Users/OSU/UCLA/UCLA Quarter IV/UNIA Research Amnesty Reports/"
+  
+  if (length(pdf_link) > 0) {
+    #Modify URL if need be (not necessary here)
+    pdf_url <- ifelse(startsWith(pdf_link, "http"), pdf_link, paste0("https://", pdf_link))
+    #Name each file "AmnestyReport[Year]"
+    
+    if (file_year == 2019 | file_year == 2014){
+      file_year = file_year - 1
+    }
+    
+    pdf_filename <- paste0("AmnestyReport", file_year)
+    #Construct the filepath by appending the file name to the save folder
+    pdf_filepath <- file.path(save_folder, pdf_filename)
+    #Download the files
+    download.file(pdf_url, destfile = pdf_filepath, mode = "wb")
+    
+    #Print out the name of the file that was downloaded
+    cat(paste("Downloaded:", pdf_filepath, "\n"))
+  } else {
+    cat("PDF link not found on the download page.\n")
+  }
+  
+  #Move file_year down by 1
+  file_year = file_year - 1
+  
+  #Repeat!
+}
+
+
+```
+
+
+```{r}
+#Now that we have the Amnesty reports saved
+#we can search them for mentions of each country
+#Because of the issues highlighted above with demonymns
+#I think it is easiest to do an exact search
+#for the country name only
+
+#E.g. exact search will yield "Israel" but not "Israeli"
+#This will clarify the distinction and even the usage
+
+#If necessary, I can later also do an exact search for demonymns
+#And merge them together
+#But assuming that ratio of demonym usage to country name usage
+#is similar across all countries
+#then it should be unnecessary to include the demonyms at all. 
+
+
+#Other issues to consider
+#1. Are Israel and Palestine always mentioned together?
+#Should we count mentions of Palestine
+#Or is Israel always mentioned alongside it?
+#Possible undercount if not
+
+#2. Need to include extinct countries (e.g. USSR)
+
+#3. What about countries with multiple names?
+#E.g. Myanmar/Burma, USSR/Soviet Union, Vietnam/Viet Nam
+
+#4. I can use tolower, right?
+#As long as country names are lowercase, this should be fine.
+#Probably doesn't matter though
+#Might get a slightly more accurate count if I lowercase everything
+#Because sometimes the country names are in all caps
+
+
+
+
+#Loop through each pdf and search it!
+
+
+
+
+
+
+library(pdftools)
+library(stringr)
+library(dplyr)
+
+# Read the PDF file
+sample_report = paste(pdf_text("C:/Users/jag11/Downloads/Amnesty Rport random year.pdf"), collapse = " ")
+#sample_report
+
+#Check to make sure it got the whole thing
+#R stopped printing at some point "the public"
+#Try searching for "Financial Control", which only appears once in the document after the cut point
+
+#Note: Words that are bisected by a line break will not be captured
+#I think this is fine, as this should be completely random
+#Only possible bias is that it should under-count countries with long names
+#Israel's name is short, so there should be no issues here
+#Bias in opposite direction if any at all. 
+
+countries_amnesty <- c(
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
+  "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus",
+  "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil",
+  "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
+  "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica",
+  "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+  "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada",
+  "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India",
+  "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
+  "Kenya", "Kiribati", "North Korea", "South Korea", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia",
+  "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar",
+  "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico",
+  "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia",
+  "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway",
+  "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines",
+  "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia",
+  "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia",
+  "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands",
+  "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland",
+  "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago",
+  "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom",
+  "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia",
+  "Zimbabwe"
+)
+
+
+
+# Tokenize the sample_report into words
+#str_count can parse through the whole report
+#But str_detect needs it tokenized first
+sample_words <- unlist(str_split(sample_report, "\\s+"))
+
+
+# Initialize an empty list to store data frames
+country_fq_amnesty_list <- lapply(countries_amnesty, function(country) {
+  
+  
+  #Method 1: Case sensitive
+  #NOTE: This only counts exact matches! (Methods 1,2,3, and 5)
+  detect_amnesty1 <- str_detect(sample_words, fixed(country))
+  
+  #Method 2: Case insensitive (all lowercase)
+  detect_amnesty2 = str_detect(tolower(sample_words), fixed(tolower(country)))
+  
+  #Method 3: Case insensitive (all lowercase)
+  #More complicated version of Method 2
+  #Alternative way using regular expressions:
+   # Detect occurrences of the country in the text (exact matches, case-insensitive)
+  #Note that "\\b" means blank space. 
+  detect_amnesty3 <- str_detect(sample_words, regex(paste0("\\b", country, "\\b"), ignore_case = TRUE))
+  
+  #Method 5: Case sensitive
+  #Combine the two approaches
+  #This and the original method are the only approaches that can handle multi-word countries. 
+  detect_amnesty5 <- str_count(sample_report, regex(paste0("\\b", country, "\\b"), ignore_case = TRUE))
+
+  
+  # Count the number of occurrences
+  count_amnesty1 <- sum(detect_amnesty1)
+  count_amnesty2 <- sum(detect_amnesty2)
+  count_amnesty3 <- sum(detect_amnesty3)
+  count_amnesty5 = sum(detect_amnesty5)
+  
+  #Original method, for comparison:
+  #Original method is basically just ctrl+F
+  #E.g. includes "Israeli" and "Israel" for Israel
+  #New methods only include "Israel"
+  count_amnesty4 <- str_count(sample_report, country)
+  
+  # Create a data frame for the current country
+  data.frame(Country = country, Frequency1 = count_amnesty1, Frequency2 = count_amnesty2, Frequency3 = count_amnesty3, Frequency4 = count_amnesty4, Frequency5 = count_amnesty5, stringsAsFactors = FALSE)
+})
+
+# Combine the list of data frames into a single data frame
+country_fq_amnesty <- do.call(rbind, country_fq_amnesty_list)
+
+# Sort in descending order of Frequency
+sorted_country_fq_amnesty <- country_fq_amnesty %>%
+  arrange(desc(Frequency2))
+
+scfa = sorted_country_fq_amnesty %>% mutate(Inexact = Frequency4 - Frequency5)
+
+#Create a new column for Year
+scfa = scfa %>% mutate(Year = 1990)
+
+
+#Create a new column for percentage
+#Because the reports get longer over time
+#total counts per year should increase for all countries
+#Normalize by total count per year
+#To calculate a "percent focus" on each country
+#Must be calculated differently for each Frequency method
+
+scfa <- scfa %>%
+  group_by(Year) %>%
+  mutate(pct_fq4 = Frequency4 / sum(Frequency4) * 100,
+         pct_fq5 = Frequency5 / sum(Frequency5) *100)
+
+
+
+
+# Display the sorted data frame
+print(scfa)
+
+
+
+
+
+
+
+
+
+
+
+#Issues with Frequency5
+
+#The term "Israeli-Occupied Territories" is used as a country
+#Used in lists alongside "India", "Honduras", etc.
+#This is problematic because it will severley undercount Israel
+
+#Solution: Use Frequency 4.
+
+#But that has it's own issues
+
+#Issues with Frequency4:
+
+#Demonyms are uneven. "Israeli" counts but "Chinese" doesn't
+#Overcounts Israel relative to certain other pariah states
+
+#Solution: Use Frequency 5. 
+
+
+
+
+
+#Overall plan: 
+#1. Use Frequency 5.
+#2. If results still have Israel at the top, our job is done. Result is actually stronger given undercounting
+#3. If results do not have Israel at the top, read through one report from each decade.
+#4. Figure out if "Israeli-Occupied Territories" is the only other word used for Israel (e.g. "Palestine"?)
+#5. Figure out if there are comparable alternative words for other countries
+#6. Manually add all alternative words to the dictionary of country names.
+#7. Manually combine rows for necessary countries to get an accurate count for each one
+#8. Rerun code to get updated results. 
+
+#9. Either way, add in extinct countries
+
+
+
+
+
+#Let's try it!
+
+
+```
+
+
+```{r}
+#2/12/2024 - as far as I can tell, this is where I need to start running the code
+#In order to regenerate the results. 
+
+
+library(pdftools)
+library(dplyr)
+library(stringr)
+
+# Initialize an empty list to store data frames
+all_reports_data <- list()
+
+# Specify the folder path containing the reports
+folder_path <- "C:/Users/OSU/UCLA/UCLA Quarter IV/UNIA Research Amnesty Reports"
+
+# List all PDF files in the folder
+#Note: They all end in four digits, not in .pdf
+pdf_files <- list.files(folder_path, pattern = "\\d{4}$", full.names = TRUE)
+
+# Iterate through each PDF file
+for (pdf_file in pdf_files) {
+  
+  # Extract the year from the file name using regular expression
+  year_of_report <- as.numeric(str_extract(basename(pdf_file), "\\d{4}"))
+  
+  # Read the PDF and collapse it into a single string
+  sample_report <- paste(pdf_text(pdf_file), collapse = " ")
+
+  # Tokenize the sample_report into words
+  sample_words <- unlist(str_split(sample_report, "\\s+"))
+
+  # Initialize an empty list to store data frames for each report
+  country_fq_amnesty_list <- lapply(countries_amnesty, function(country) {
+    
+    #Method 1: Case sensitive
+    #NOTE: This only counts exact matches! (Methods 1,2,3, and 5)
+    detect_amnesty1 <- str_detect(sample_words, fixed(country))
+    
+    #Method 2: Case insensitive (all lowercase)
+    detect_amnesty2 = str_detect(tolower(sample_words), fixed(tolower(country)))
+    
+    #Method 3: Case insensitive (all lowercase)
+    #More complicated version of Method 2
+    #Alternative way using regular expressions:
+     # Detect occurrences of the country in the text (exact matches, case-insensitive)
+    #Note that "\\b" means blank space. 
+    detect_amnesty3 <- str_detect(sample_words, regex(paste0("\\b", country, "\\b"), ignore_case = TRUE))
+    
+    #Method 5: Case sensitive
+    #Combine the two approaches
+    #This and the original method are the only approaches that can handle multi-word countries. 
+    detect_amnesty5 <- str_count(sample_report, regex(paste0("\\b", country, "\\b"), ignore_case = TRUE))
+  
+    
+    # Count the number of occurrences
+    count_amnesty1 <- sum(detect_amnesty1)
+    count_amnesty2 <- sum(detect_amnesty2)
+    count_amnesty3 <- sum(detect_amnesty3)
+    count_amnesty5 = sum(detect_amnesty5)
+    
+    #Original method, for comparison:
+    #Original method is basically just ctrl+F
+    #E.g. includes "Israeli" and "Israel" for Israel
+    #New methods only include "Israel"
+    count_amnesty4 <- str_count(sample_report, country)
+
+    # Create a data frame for the current country
+    data.frame(Country = country, Frequency1 = count_amnesty1, Frequency2 = count_amnesty2, 
+               Frequency3 = count_amnesty3, Frequency4 = count_amnesty4, 
+               Frequency5 = count_amnesty5, stringsAsFactors = FALSE)
+  })
+
+  # Combine the list of data frames for each report into a single data frame
+  report_data <- do.call(rbind, country_fq_amnesty_list)
+
+  # Add a new column for the report's year
+  report_data$Year <- year_of_report  
+
+  # Add the report's data to the list of all reports' data
+  all_reports_data[[pdf_file]] <- report_data
+}
+
+# Combine the list of data frames for all reports into a single data frame
+all_reports_combined <- bind_rows(all_reports_data)
+
+
+arc = all_reports_combined %>% mutate(Inexact = Frequency4 - Frequency5)
+
+
+
+
+#Note: 3/12/24
+#I'm guessing this was just a glitch,
+#but the code below to calculate pct_fq did not work this time through. 
+#I checked and the original csv file saved in Fall 2023 was correct
+#The percentages were correct and they added up to 100 in 2023. 
+#But this time through, R calcualted fq wrong in the code
+#Because it was failing to group by year when calculating sums
+#So every observation had the same sum
+#And all of the pcts were really small
+#I coded in a workaround (the sums/arc3 stuff below)
+#Use this if it happens again
+#But I'm almost certain the original code is correct
+#So if I run it again after restarting R, it should work
+#If it fails, use the workaround or the existing csv file
+#The line to save the data as a csv file is also commented out
+
+
+
+#sums <- aggregate(cbind(Frequency4, Frequency5) ~ Year, data = arc, FUN = sum)
+
+# Merge the sums back into the original data
+#arc3 <- merge(arc, sums, by = "Year", suffixes = c("", "_sum"))
+
+# Calculate the percentage scores
+#arc3$pct_fq4 <- with(arc3, Frequency4 / Frequency4_sum * 100)
+#arc3$pct_fq5 <- with(arc3, Frequency5 / Frequency5_sum * 100)
+
+arc <- arc %>% group_by(Year) %>% mutate(pct_fq4 = (Frequency4 / sum(Frequency4)) * 100, 
+                                         pct_fq5 = (Frequency5 / sum(Frequency5)) *100)
+
+#Cut out the data from the year 2020. 
+#This report (which covered 2019) was downloaded erroneously
+#There was no global report that year
+#The one I downloaded was the 2020 Middle East regional report
+#Which obviously focuses to a large extent on Israel
+arc = arc %>% subset(Year != 2020)
+
+
+
+#Save arc to a csv file
+#write.csv(arc, file = "AmnestyMentions.csv", row.names = FALSE)
+
+
+#This is where you load in the dataset if you don't want to run all the code again
+#Note: Does not include "Palestin" but does include "Palestine". 
+
+
+# 3/12/24 - The file was already saved, but the new arc object I just created is identical to it. 
+
+
+
+
+
+
+
+
+#Things to do
+#1. Double check all reports to make sure no other errors like 2020
+#This is correct. I just looked through all the reports (3/12/24) and they're all good
+#Note: I earlier removed 2014 and 2019, which don't have annual reports. 
+#Every other year has an actual annual report. 
+#2. Repeat this loop for another countries_amnesty list that just includes "Palestin". 
+#3. Bind that new df to the current df.  
+#4. 
+
+```
+
+
+
+```{r}
+
+
+arc_sorted_fq5 = arc %>% arrange(desc(pct_fq5))
+
+arc_sorted_fq4 = arc %>% arrange(desc(pct_fq4))
+
+a_look4 = arc %>% arrange(desc(Frequency4))
+
+
+#Where does Israel rank among the most targeted nations?
+
+
+#First analysis: Average over time
+
+#Make the row order a column in itself
+#Countries which are more targeted should have row numbers closer to 1
+#Thus, whichever country has the lowest average row number is the most targeted. 
+library(tibble)
+arc_sorted_fq5 <- rownames_to_column(arc_sorted_fq5, var = "rank")
+#Calculate average country rank across all years
+
+
+
+arc_sorted_fq5 <- arc_sorted_fq5 %>%
+  group_by(Country) %>%
+  mutate(avg_rank = mean(as.numeric(rank), na.rm = TRUE) / 60)
+
+
+#For better viewing, subset the data to look at only 1 year
+#Values of avg_rank are constant across years
+
+arc_sf5_2023 = arc_sorted_fq5 %>% subset(Year == 2023) %>% arrange(avg_rank)
+
+head(arc_sf5_2023)
+#So even when severely undercounted, Israel is still first by a long shot
+#That is, if this variable avg_rank means anything
+#I think it does, I'm just having trouble interpreting it. 
+
+#Now let's see what happens if we use Frequency4
+
+
+arc_sorted_fq4 <- rownames_to_column(arc_sorted_fq4, var = "rank")
+#Calculate average country rank across all years
+
+
+
+arc_sorted_fq4 <- arc_sorted_fq4 %>%
+  group_by(Country) %>%
+  mutate(avg_rank = mean(as.numeric(rank), na.rm = TRUE) / 60)
+
+
+#For better viewing, subset the data to look at only 1 year
+#Values of avg_rank are constant across years
+
+arc_sf4_2023 = arc_sorted_fq4 %>% subset(Year == 2023) %>% arrange(avg_rank)
+
+head(arc_sf4_2023)
+
+#It's even more clear
+#Israel is the most targeted across time
+
+
+
+
+
+#Try a better visualization. 
+#First sort by year
+
+arc_pretty5 <- arc %>%
+  arrange(Year, desc(pct_fq5))
+
+arc_pretty5 <- rownames_to_column(arc_pretty5, var = "rank")
+
+
+#Create variable rank2
+#rank2 = rank for that year
+arc_pretty5 <- arc_pretty5 %>%
+  mutate(rank2 = (as.numeric(rank) - 1) %% length(countries_amnesty) + 1)
+#Note the use of the countries_amnesty object here. 
+
+#Cacluate mean rank scores
+arc_pretty5 <- arc_pretty5 %>%
+  group_by(Country) %>%
+  mutate(avg_rank = mean(rank2, na.rm = TRUE))
+
+#For better viewing, subset the data to look at only 1 year
+#Values of avg_rank are constant across years
+
+arc_p5_2023 = arc_pretty5 %>% subset(Year == 2023) %>% arrange(avg_rank)
+head(arc_p5_2023)
+
+display_avg_df = arc_p5_2023 %>% select(c("Country", "avg_rank"))
+head(display_avg_df)
+
+#Same result as above, but now the numbers actually mean something
+#Israel's average rank is 11th. 
+#Additional interpretation: This isn't even focusing on the "era of Israel bias"
+#So this is a hard test of the theory. 
+#Still biased even if you include a good chunk of the Cold War period. 
+
+
+#Repeat for Frequency4
+arc_pretty4 <- arc %>%
+  arrange(Year, desc(pct_fq4))
+
+arc_pretty4 <- rownames_to_column(arc_pretty4, var = "rank")
+
+
+#Create variable rank2
+#rank2 = rank for that year
+arc_pretty4 <- arc_pretty4 %>%
+  mutate(rank2 = (as.numeric(rank) - 1) %% length(countries_amnesty) + 1)
+#Note the use of the countries_amnesty object here. 
+
+#Cacluate mean rank scores
+arc_pretty4 <- arc_pretty4 %>%
+  group_by(Country) %>%
+  mutate(avg_rank = mean(rank2, na.rm = TRUE))
+
+#For better viewing, subset the data to look at only 1 year
+#Values of avg_rank are constant across years
+
+arc_p4_2023 = arc_pretty4 %>% subset(Year == 2023) %>% arrange(avg_rank)
+head(arc_p4_2023)
+
+#Same result
+#Under this coding, Israel's rank is 6th. 
+#Again, it is on average (over time) the most-scrutinized country by Amnesty International
+
+
+
+
+
+#Big question: Is Israel undercounted by both counts?
+#Israel is undercounted if there are significant mentions of "Palestin-" that go uncounted. 
+#Looking at 2022-2023 report, "Palestinian" is mentioned 112 times
+#And "Palestine" is mentioned 10 times.
+#27 instances of "Palestinian" do not have "Israel" in the same sentence (using Fq 4)
+#Of those 27, half are in the section criticizing Palestine
+#Of the other half, all are either in paragraphs discussing Israel
+#Or they discuss Palestinians or Palestinian groups in third countries
+#e.g. France, Turkey, Bahrain. 
+
+
+#What about the most generous possible counting of Israel?
+#Look at the 2022-2023 report. 
+#Include "Israel" (134) and "Palestin" (122)
+#Total = 256
+#Compare to Russia/Ukraine
+#Most generous count of Russia includes "Russia" (221) and "Ukrain" (252)
+#Total = 473. 
+#In 2022-2023 report, Israel is not the most focused-on country
+
+
+
+
+
+
+
+
+#Look only at Israel and its ranking
+
+ap5_israel = arc_pretty5 %>% subset(Country == "Israel")
+ap5_israel = ap5_israel %>% mutate(rank3 = length(countries_amnesty) - rank2)
+ap4_israel = arc_pretty4 %>% subset(Country == "Israel")
+ap4_israel = ap4_israel %>% mutate(rank3 = length(countries_amnesty) - rank2)
+
+
+
+
+#3/12/24
+#This may have been a major error
+#The number of countries changes over time
+#Instead of all countries in countries_amnesty, use all countries mentioned in a given report. 
+#When I regenerate these plots, make sure this is fixed. 
+
+
+
+
+
+
+
+
+#Plot Israel's rank over time
+library(ggplot2)
+
+ggplot() +
+  geom_line(data = ap5_israel, aes(x = Year, y = rank3, color = "Frequency5")) +
+  geom_line(data = ap4_israel, aes(x = Year, y = rank3, color = "Frequency4")) +
+  labs(title = "Growing Focus on Israel over Time (Amnesty)",
+       x = "Year",
+       y = "Rank among Countries (194 = Most Scrutinized)") +
+  geom_hline(yintercept = length(countries_amnesty) - 1, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Frequency5" = "blue", "Frequency4" = "red"))
+
+
+
+
+
+
+#Look at just Israel
+
+israel_over_time = arc %>% subset(Country == "Israel")
+
+#Plot focus on Israel over time
+library(ggplot2)
+
+# Using ggplot2
+ggplot(israel_over_time, aes(x = Year)) +
+  geom_line(aes(y = pct_fq4, color = "pct_fq4"), size = 1) +
+  geom_line(aes(y = pct_fq5, color = "pct_fq5"), size = 1) +
+  labs(x = "Time", y = "Percent Focus", title = "Focus on Israel over time (Amnesty)") +
+  scale_color_manual(values = c("pct_fq4" = "red", "pct_fq5" = "blue")) +
+  theme_minimal()
+
+
+#Results are actually quite similar across the two different counts
+
+
+
+
+
+
+```
+
+
+```{r}
+
+#Part 3: What explains the focus?
+#Includes other analyses and notes. 
+#Mostly this is failed crap. 
+
+
+#Question: Does the percent focus correlate with anything?
+
+
+#Check both the year of the report and the year that the report covered. 
+#Question: When are reports published?
+#2022 report was published in March, so maybe we go with that?
+#Check both, but year of covaerage is probably better
+
+
+
+
+
+#First attempt:
+#Look at # of Palestinian fatalities per year
+#See if it correlates with pct_fq (4 or 5)
+
+#Data seems to be pretty sparse so let's go with what we've got
+#UN Office for the Coordination of Humanitarian Affairs.
+#I'm just going to manually code it in since it only covers 2008-2023.
+
+#These are the numbers for 2008-2022
+#Stop at 2022 because that's when the reports stop
+#Also, I removed 2018 and 2019 numbers because I don't have 2019 or 2020 reports
+#Also removed 2013 numbers because I don't have the 2014 report. 
+pal_fatal = c(899, 1066, 95, 124, 260, 2329, 174, 109, 77, 30, 349, 191)
+#Combine this with the other data
+#Remember, Year = 2009 in dataset corresponds to 2008 fatalities
+israel_test_kill = israel_over_time %>% subset(Year >= 2009)
+
+israel_test_kill <- cbind(israel_test_kill, pal_fatal)
+
+
+israel_test_kill <- israel_test_kill %>%
+  rename(pal_fatal = ...11)
+
+#Run a regression to see if there's any correlation between pal_fatal and pct_focus
+#fq4 is probably better but let's also try fq5
+
+reg_fatal4 = lm(pct_fq4 ~ pal_fatal, data = israel_test_kill)
+summary(reg_fatal4)
+
+reg_fatal5 = lm(pct_fq5 ~ pal_fatal, data = israel_test_kill)
+summary(reg_fatal5)
+
+#No correlation
+#p-values are super high. 
+#Sample size is really small though so hard to tell for sure. 
+#Need a reliable fatality count from 1960s onward. 
+
+
+
+
+
+
+
+#Correlation with year of report:
+
+israel_kill2 = israel_over_time %>% subset(Year >= 2008 & Year < 2023)
+
+israel_kill2 <- cbind(israel_kill2, pal_fatal)
+
+
+israel_kill2 <- israel_kill2 %>%
+  rename(pal_fatal = ...11)
+
+#Run a regression to see if there's any correlation between pal_fatal and pct_focus
+#fq4 is probably better but let's also try fq5
+
+reg_fatal4_same = lm(pct_fq4 ~ pal_fatal, data = israel_kill2)
+summary(reg_fatal4_same)
+
+reg_fatal5_same = lm(pct_fq5 ~ pal_fatal, data = israel_kill2)
+summary(reg_fatal5_same)
+
+
+#No correlation with publication year either.
+
+
+
+
+
+
+#Plot the three varaibles together
+#pct_fq5, pct_fq4, and pal_fatal (year prior)
+ggplot(israel_test_kill, aes(x = Year)) +
+  geom_line(aes(y = pct_fq4, color = "pct_fq4"), size = 1) +
+  geom_line(aes(y = pct_fq5, color = "pct_fq5"), size = 1) +
+  geom_line(aes(y = log(pal_fatal), color = "pal_fatal"), size = 1) +
+  labs(x = "Time", y = "Dependent Variables", title = "Focus on Israel Alongside Logged Palestinian Fatalities") +
+  scale_color_manual(values = c("pct_fq4" = "red", "pct_fq5" = "blue", "pal_fatal" = "green")) +
+  theme_minimal()
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+#Random checks
+
+
+
+#Is Israel undercounted more severely than other countries using Fq5?
+
+plot(israel_over_time$Frequency4, israel_over_time$Frequency5)
+plot(arc$Frequency4, arc$Frequency5)
+
+
+fit_israel <- lm(Frequency5 ~ Frequency4, data = israel_over_time)
+fit_all <- lm(Frequency5 ~ Frequency4, data = arc)
+
+# Plot the points
+plot(israel_over_time$Frequency4, israel_over_time$Frequency5, main = "Scatter Plot with Line of Best Fit",
+     xlab = "Frequency4", ylab = "Frequency5")
+
+# Add the line of best fit
+abline(fit_israel, col = "red")
+
+#Display the slope
+cat("Slope of the line of best fit (Israel):", coef(fit_israel)[2], "\n")
+
+
+plot(arc$Frequency4, arc$Frequency5, main = "Scatter Plot with Line of Best Fit",
+     xlab = "Frequency4", ylab = "Frequency5")
+
+# Add the line of best fit
+abline(fit_all, col = "red")
+
+# Display the slope
+cat("Slope of the line of best fit (All):", coef(fit_all)[2], "\n")
+
+#Results: 
+
+#Slope of the line of best fit (Israel): 0.4164823 
+#Slope of the line of best fit (All): 0.7093669 
+
+#Simpler method: Use correlation coefficient:
+
+# Calculate correlation coefficient
+#Nvm that doesn't work. 
+#That tells us whether there's a linear relationship, but we care about the slope. 
+
+
+
+#Relative to Frequency 4, Fq5 undercounts Israel much more than it undercounts other countries.
+
+
+
+
+
+
+
+# Sort in descending order of Frequency2 for all reports
+#sorted_all_reports <- all_reports_combined %>% arrange(desc(Frequency5))
+
+# Add any additional analysis or visualization steps here
+
+#sar_amnesty = sorted_all_reports %>% mutate(Inexact = Frequency4 - Frequency5)
+
+
+
+#Create a new column for percentage
+#Because the reports get longer over time
+#total counts per year should increase for all countries
+#Normalize by total count per year
+#To calculate a "percent focus" on each country
+#Must be calculated differently for each Frequency method
+
+#sara_final <- sar_amnesty %>%
+#  group_by(Year) %>%
+#  mutate(pct_fq4 = Frequency4 / sum(Frequency4) * 100,
+#         pct_fq5 = Frequency5 / sum(Frequency5) *100)
+
+
+
+
+# Display the sorted data frame
+#print(sara_final)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Non-issues (solved or ignored):
+
+#1. Possessives are not being counted
+#E.g. "India's"
+
+#Solution: I think this is fine
+#The distribution should be random across countries
+
+#Can actually check the distribution
+#Subtract Frequency 3 from one of the other Freqencies (e.g. Frequency 4)
+#And plot it. 
+
+#2. Frequencies 1-3 can't handle countries with multi-word names
+#They find zero instances of all of them. 
+#Solved using Frequency 5
+
+#Can compare distribution of differences between Frequency 4 and Frequency 5. 
+
+#Plot histogram:
+
+hist(scfa$Inexact, 
+     main = "Distribution of Inexact: Proxy for degree of undercounting/overcounting",
+     xlab = "Difference in mentions from using Frequency 4 vs. Frequency 5",
+     ylab = "Frequency",
+     breaks = 20,
+     col = "lightblue",
+     border = "black")
+
+#Using method 5 vs. method 4 leads to extreme undercounting of Israel
+#India is most undercounted country, then Israel is second
+#Both are crazy outliers.
+
+
+
+
+
+
+#Ultimately, we want to normalize by / regress on two possible explanatory variables
+#1. News coverage of Israel - Google Trends or # of NYT articles
+#2. Death count of the conflict. 
+#Might have to normalize by overall death count for each year, or overall mentions. 
+#E.g. 2020 will have few mentions of any conflict, since most media would be focused on COVID. 
+#So in 2020, we should see a decrease in mentions of Israel
+#But this doesn't indicate a decrease in Israel's prominence vs. other pariah states.
+#Since Amnesty only focused on pariah states, relative prominence is what matters
+#Relative vs. absolute importance (#3 and #4)
+
+
+
+
+
+
+```
+
+
+
+
+```{r}
+
+#NYT Articles:
+
+#Are NYT Articles correlated with Amnesty mentions?
+#And are they correlated with death count?
+
+#Use their API to pull articles:
+
+
+
+
+#Use Michelle's old code and modify it:
+
+#Israel API
+
+#Michelle's Instructions:
+# Go to:  http://developer.nytimes.com 
+# Create an account and sign-in
+# Click "My apps" from the drop-down menu in the top right corner
+# Click "New app"
+# Fill the name of an app (mine is MYAPPPOLI507)
+# Activate the different APIs services (click the + sign next to each service)
+# Click "Create" and voila!
+# Copy the access key and assign it to the "nytimeskey" variable below
+
+# Now let's some querys to the app *manually"
+# Because using Web APIs in R will involve repeatedly constructing different GET requests 
+# with slightly different components each time, it is helpful to store many of the individuals
+# components as objects and combine them using ```paste()``` when ready to send the request.
+
+# First, we know that every call will require us to provide:
+# a) a base URL for the API, 
+# b) some authorization code or key, and  
+# c) a format for the response.
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "SRU0lRN1GhfLR0hm6NAINLq9MvY1NXt6" #My API key  #This is the only line that changes, I think
+response.format<-".json"
+
+#Search term: "Israel"
+#We want this term to appear in the headline, not the body
+
+
+###
+#Could also try "Palestine" and "Palestinian" or "Palestinians"
+#The latter is probably best, since the focus should be on the victims in both the article and Amnesty
+
+#Michelle's notes:
+#Note: Because of weird syntax issues, we need single quotes inside double quotes
+#And for the filter, we need \ before and after each quote. 
+#But for double quotes within double quotes, you apparently have to escape with / instead of \
+
+
+#These also need to be modified
+search.term<-"'Israel'"
+filter.query<-"headline:\"\'Israel\'\""
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Michelle's notes
+# Once all the pieces of our GET request are in place, we can use either the paste() or paste0()
+# to combine a number of different character strings into a single character string.  
+# [QUESTION: Difference between paste and paste0????] #Answer: Separator between added elements
+# This final string will be our URL for the GET request.
+
+#Alternative operationalization that I didn't pursue:
+#Another option: Look at articles published on Sunday only
+#Dates: facet_field=Sunday&facet=true&begin_date=20120101&end_date=20120101
+
+# Paste components together to create URL for get request
+
+
+#Seems like this is also where you specify the beginning and end dates?
+#In this case, do all years since Amnesty started publishing reports. 1962
+#So let's look at 1961-present (2024). 
+
+# get.request<-paste0(api_base.url, 
+#                     response.format, "?", "q=", search.term, 
+#                     "&fq=", filter.query, "&facet_field=begin_date=19610101&end_date=19631009", "&api-key=", nytimeskey)
+
+
+#The key here is setting facet_fields=source and facet_filter=true
+#According to NYT's API website, facet_filter=true ensures that the date filters are actually applied
+#See this website: https://developer.nytimes.com/docs/articlesearch-product/1/overview
+
+
+#&facet_fields=source
+
+get.request<-paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                    "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=20230101&end_date=20230311", "&api-key=", nytimeskey)
+#Print out the get request
+print(get.request)
+
+# Now let's just grab it!
+response<-httr::GET(url = get.request)
+print(response)
+str(response)
+
+#Michelle's notes
+# The `content() function allows us to extract the html response in a format of our choosing 
+# (raw text, in this case):
+
+# Inspect the content of the response, parsing the result as text
+response<-httr::content(x = response, as = "text")
+#Warning message: "No encoding supplied: defaulting to UTF-8"
+#I don't think this is an issue so I'm just going to ignore it
+substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+
+#Michelle's notes
+# The final step in the process involves converting the results from JSON format to something
+# easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+# easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+
+
+# Convert JSON response to a dataframe
+response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+
+print(response)
+# Inspect the dataframe
+str(response.df, max.level = 3)
+
+# Notice that the really important element of the list is "response" that has all the elements that we want
+response.df <- response.df$response
+str(response.df)
+
+# But it has more elements with different sizes...
+View(response.df$docs) # Weird... only 10 news pieces
+
+
+tiles = response.df$docs %>% select("abstract")
+#View(tiles)
+#Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+#Nvm, I was looking at the abstract
+#I think I should be looking at the variable called "headline.main".
+#This column mentions Israel all 10 times. 
+#Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+
+# Get number of hits
+print(response.df$meta$hits) # x articles that mention Israel?
+#But only 38909 articles have Israel in the headline (2013 to 2023)
+#Figure this out. That's basically right
+
+
+#Now, when we exapnd search to 1961-2014, there are only 40762 hits!?
+#That seems really weird. 
+#40497 when we restrict to Dec 31, 2023 as end date. 
+#What is going on? Can there really be only 2000 or so articles from 1961 - 2013 that mention Israel in the headline?
+#Let's check directly. 
+#36261
+#Makes no sense
+#What is happening?
+#Are we hitting a limit?
+#Even when we restrict to 1961-1963, we still get 10,721 hits. 
+
+
+#Tried to fix it using facet_filter = true
+#Let's check the math now: 
+#19610101 to 19900101: 14,453
+#19610101 to 20240308: 31,071
+#19900101 to 20240308: 16,621
+#This should add up. Does it? Yes! There is an overlap of three.
+#probably because there were three articles on Jan 1, 1990. (Confirmed!)
+#It works!
+
+#Now let's do a loop to pull all of these from the API and store them in a data frame. 
+#Loop will need 31071/10 iterations = 3108 iterations. 
+#Not sure what happens though if we go over
+#So I'm going to play it safe and do 3107 iterations
+#This should just leave out one article, which should be fine. 
+
+
+# Notice that the app only allows you to get 10 hits per request
+# Thus, we need to make (# of hits/10) calls (!!!)
+
+
+
+library(plyr)
+
+#Save response to the "docs" data frame
+docs <- response.df$docs
+print(class(docs)) #Confirm that docs is a data frame
+
+#Loop over full set of articles
+for(i in 1:31){
+  
+  #Create the search url
+ temp_get <- paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                                 "&fq=", filter.query, "&api-key=", nytimeskey,
+                                 "&page=",i) 
+ 
+ #Grab the response
+ temp_response<-httr::GET(url = temp_get)
+ 
+ #Clean it up with functions and JSON
+ temp_response<-suppressMessages(httr::content(x = temp_response, as = "text"))
+ temp_response.df<-jsonlite::fromJSON(txt = temp_response, simplifyDataFrame = TRUE, flatten = TRUE)
+ 
+ #Create object with cleaned up response
+ temp_docs <- temp_response.df$response$docs
+ #docs[[i+1]] <- temp_docs
+ 
+ #Print class of newly-found articles
+ #If its "NULL", then the call returned nothing / didn't happen
+ #If its data frame, we're all good
+ print(class(temp_docs))
+ 
+ #If the loop starts adding null data frames, stop it. 
+ if (is.null(temp_docs)){
+ break
+ }
+ 
+ #Move this inside the loop
+ #Bind the newly-found documents to the larger data frame of documents
+ docs = rbind.fill(docs, temp_docs)
+ 
+ #Can cut this if I need space
+ #Check class: Should be data frame
+ print(class(docs))
+ #print(class(docs[[i+1]]))
+ 
+ #Remove the results so you can fill them in again each time through the loop
+ rm(temp_get, temp_response, temp_docs)
+ print(paste("Round", i, ": success!!"))
+ 
+ #Thanks, Clayton!
+ #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+ 
+
+}
+
+
+#Error when i = 2944. 
+#Error in curl::curl_fetch_memory(url, handle = handle) : 
+#  Timeout was reached: [api.nytimes.com] Resolving timed out after 1604161 milliseconds
+#This is 26 minutes, so I'm assuming it is referring to the time limit of a single API call
+#(single iteration through loop)
+
+
+#Actually, this is my updated understanding of what happened.
+#After 500 API calls, I reached the daily limit. 
+#This did not stop the loop however, which kept calling the API
+#The API continued to give it a NULL data frame in response. 
+#But it just kept running anyway. 
+#Until something made my loop hit the time limit. 
+
+#Note: After running the code, I get the following error
+#"Error in exists(cacheKey, where = .rs.WorkingDataEnv, inherits = FALSE) : 
+#invalid first argument"
+#Nothing seems to change though, so I'm just going to ignore it
+
+sum(unlist(lapply(docs, function(x) nrow(x)))) # Check this!
+
+View(docs)
+#Success!
+
+
+
+
+
+
+
+
+#Check for duplicate rows:
+
+# Check for duplicate rows in "docs"
+duplicate_rows <- docs[duplicated(docs), ]
+
+# Print duplicate rows
+print(duplicate_rows)
+
+# Count the number of duplicate rows
+num_duplicate_rows <- sum(duplicated(docs))
+
+# Print the number of duplicate rows
+print(num_duplicate_rows)
+
+
+#In the dataset of 100 articles, there is 1 duplicate row. 
+
+#Just like with the issue of irrelevant or non-NYT articles, this is probably negligible. 
+
+
+
+
+#Check for irrelevant articles. 
+
+# Count the number of rows containing the word "Israel" in the "headline.main" column
+num_rows_with_Israel <- sum(grepl("Israel", docs$headline.main, ignore.case = TRUE))
+
+# Print the result
+print(num_rows_with_Israel)
+
+# Assuming "docs" is your dataframe
+
+# Subset the dataframe to rows where "Israel" is not found in the "headline.main" column
+rows_without_Israel <- docs[!grepl("Israel", docs$headline.main, ignore.case = TRUE), "headline.main"]
+
+# Print the values of the "headline.main" column for rows without "Israel"
+print(rows_without_Israel)
+
+#Results from initial run: 280 of the articles from 2013 to 2023. 
+#Weirdly, only 267 out of the 280 rows actually mention Israel in the headline
+#I thought we were filtering for that, but now I don't know
+#Fortunately, all of the articles that don't directly mention Israel seem to be about Israel primarily or at least secondarily
+#Probably just filter these out to be safe
+#Also filter out the articles not by NYT. Some are by AP and Reuters. 
+
+
+
+
+
+
+
+
+#Problem: I'm hitting the limit with API calls
+#Solution: I don't actually need these articles. 
+#I just need the number of articles in a given year. 
+#So we can abandon the loop that actually pulls the articles
+#And instead just loop the initial chunk of code. 
+
+
+
+
+
+
+
+#NOTE: Run code at top (which defines search terms, etc.) before running this. 
+
+
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "SRU0lRN1GhfLR0hm6NAINLq9MvY1NXt6" #My API key  #This is the only line that changes, I think
+response.format<-".json"
+
+#Search term: "Israel"
+#We want this term to appear in the headline, not the body
+
+
+###
+#Could also try "Palestine" and "Palestinian" or "Palestinians"
+#The latter is probably best, since the focus should be on the victims in both the article and Amnesty
+
+#Michelle's notes:
+#Note: Because of weird syntax issues, we need single quotes inside double quotes
+#And for the filter, we need \ before and after each quote. 
+#But for double quotes within double quotes, you apparently have to escape with / instead of \
+
+
+#These also need to be modified
+search.term<-"'Palestinian'"
+filter.query<-"headline:\"\'Palestinian\'\""
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Initialize empty data frame
+
+hits_results = data.frame(yr_range = numeric(), 
+                          hits_range = numeric(),
+                          stringsAsFactors = FALSE)
+
+
+for (yr in 1961:2023){
+  
+  get.request<-paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                      "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=", yr, "0101&end_date=", yr, "1231", "&api-key=", nytimeskey)
+  #Print out the get request
+  print(get.request)
+  
+  # Now let's just grab it!
+  response<-httr::GET(url = get.request)
+  print(response)
+  str(response)
+  
+  #Michelle's notes
+  # The `content() function allows us to extract the html response in a format of our choosing 
+  # (raw text, in this case):
+  
+  # Inspect the content of the response, parsing the result as text
+  response<-httr::content(x = response, as = "text")
+  #Warning message: "No encoding supplied: defaulting to UTF-8"
+  #I don't think this is an issue so I'm just going to ignore it
+  substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+  
+  #Michelle's notes
+  # The final step in the process involves converting the results from JSON format to something
+  # easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+  # easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+  
+  
+  # Convert JSON response to a dataframe
+  response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+  
+  print(response)
+  # Inspect the dataframe
+  #str(response.df, max.level = 3)
+  
+  # Notice that the really important element of the list is "response" that has all the elements that we want
+  response.df <- response.df$response
+  #str(response.df)
+  
+  # But it has more elements with different sizes...
+  #View(response.df$docs) # Weird... only 10 news pieces
+  
+  
+  #tiles = response.df$docs %>% select("abstract")
+  #View(tiles)
+  #Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+  #Nvm, I was looking at the abstract
+  #I think I should be looking at the variable called "headline.main".
+  #This column mentions Israel all 10 times. 
+  #Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+  
+  # Get number of hits
+  #Assign this and the year to the appropriate row of the data frame
+  hits_value = response.df$meta$hits
+  yr_value = yr
+  hits_results = rbind(hits_results, data.frame(yr_range = yr_value, hits_range = hits_value))
+  
+  print(yr)
+  print(response.df$meta$hits) # x articles that mention Israel?
+  #But only 38909 articles have Israel in the headline (2013 to 2023)
+  #Figure this out. That's basically right
+  
+  #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+  
+}
+
+
+print(hits_results)
+
+
+
+
+plot(x = hits_results$yr_range, y = hits_results$hits_range, main = "\"Palestinian\" in Title, NYT")
+
+is_time = lm(hits_range ~ yr_range, data = hits_results)
+
+
+summary(is_time)
+
+
+
+
+
+
+#Save hits_results to a csv file
+#write.csv(hits_results, file = "NYTMentionsPalestinian.csv", row.names = FALSE)
+#It is now saved in UCLA Quarter IV folder
+
+
+
+
+#Should repeat this analysis with the word "Palestinians".
+#This should probably be more correlated with Amnesty mentions than "Israel". 
+```
+
+```{r}
+
+#Do this again to get a count of Israel headline mentions:
+#Use a function this time
+search.term<-"'Israel'"
+filter.query<-"headline:\"\'Israel\'\""
+
+
+o_time = function(search.term, filter.query){
+
+
+  print(filter.query) # How R stores the string
+  cat(filter.query) # How R parses the string
+  
+  #Michelle's notes (converting search terms in English to search terms in URL language)
+  # To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+  # URL encoding basically translates punctuation marks, white space, and other non 
+  # alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+  # If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+  # R provides helpful functions to doing this translation automatically.  
+  
+  # URL-encode the search and its filters
+  search.term<-URLencode(URL = search.term, reserved = TRUE)
+  filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+  print(search.term)
+  print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+  
+  #Initialize empty data frame
+  
+  hits_results = data.frame(yr_range = numeric(), 
+                            hits_range = numeric(),
+                            stringsAsFactors = FALSE)
+  
+  
+  for (yr in 1961:2023){
+    
+    get.request<-paste0(api_base.url, 
+                      response.format, "?", "q=", search.term, 
+                        "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=", yr, "0101&end_date=", yr, "1231", "&api-key=", nytimeskey)
+    #Print out the get request
+    #print(get.request)
+    
+    # Now let's just grab it!
+    response<-httr::GET(url = get.request)
+    #print(response)
+    #str(response)
+    
+    #Michelle's notes
+    # The `content() function allows us to extract the html response in a format of our choosing 
+    # (raw text, in this case):
+    
+    # Inspect the content of the response, parsing the result as text
+    response<-httr::content(x = response, as = "text")
+    #Warning message: "No encoding supplied: defaulting to UTF-8"
+    #I don't think this is an issue so I'm just going to ignore it
+    substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+    
+    #Michelle's notes
+    # The final step in the process involves converting the results from JSON format to something
+    # easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+    # easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+    
+    
+    # Convert JSON response to a dataframe
+    response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+    
+    #print(response)
+    # Inspect the dataframe
+    #str(response.df, max.level = 3)
+    
+    # Notice that the really important element of the list is "response" that has all the elements that we want
+    response.df <- response.df$response
+    #str(response.df)
+    
+    # But it has more elements with different sizes...
+    #View(response.df$docs) # Weird... only 10 news pieces
+    
+    
+    #tiles = response.df$docs %>% select("abstract")
+    #View(tiles)
+    #Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+    #Nvm, I was looking at the abstract
+    #I think I should be looking at the variable called "headline.main".
+    #This column mentions Israel all 10 times. 
+    #Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+    
+    # Get number of hits
+    #Assign this and the year to the appropriate row of the data frame
+    hits_value = response.df$meta$hits
+    yr_value = yr
+    hits_results = rbind(hits_results, data.frame(yr_range = yr_value, hits_range = hits_value))
+    
+    print(yr)
+    print(response.df$meta$hits) # x articles that mention Israel?
+    #But only 38909 articles have Israel in the headline (2013 to 2023)
+    #Figure this out. That's basically right
+    
+    #Sleep for 12 seconds, so that it does 5 pulls per minute
+   #Necessary b/c of API limit
+   Sys.sleep(12)
+    
+  }
+
+  
+  return(hits_results)
+}
+
+
+hits_israel_results = o_time(search.term = search.term, filter.query = filter.query)
+
+
+
+
+plot(x = hits_israel_results$yr_range, y = hits_israel_results$hits_range, main = "\"Israel\" in Title, NYT")
+
+is_israel_time = lm(hits_range ~ yr_range, data = hits_israel_results)
+
+
+summary(is_israel_time)
+
+```
+
+
+
+```{r}
+#Repeat with a word that should not increase or decrease with time
+#Try "Winter"
+
+
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "SRU0lRN1GhfLR0hm6NAINLq9MvY1NXt6" #My API key  #This is the only line that changes, I think
+response.format<-".json"
+
+#These also need to be modified
+search.term<-"'Winter'"
+filter.query<-"headline:\"\'Winter\'\""
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Initialize empty data frame
+
+the_hits_results = data.frame(yr_range = numeric(), 
+                          hits_range = numeric(),
+                          stringsAsFactors = FALSE)
+
+
+for (yr in 1961:2023){
+  
+  get.request<-paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                      "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=", yr, "0101&end_date=", yr, "1231", "&api-key=", nytimeskey)
+  #Print out the get request
+  print(get.request)
+  
+  # Now let's just grab it!
+  response<-httr::GET(url = get.request)
+  print(response)
+  str(response)
+  
+  #Michelle's notes
+  # The `content() function allows us to extract the html response in a format of our choosing 
+  # (raw text, in this case):
+  
+  # Inspect the content of the response, parsing the result as text
+  response<-httr::content(x = response, as = "text")
+  #Warning message: "No encoding supplied: defaulting to UTF-8"
+  #I don't think this is an issue so I'm just going to ignore it
+  substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+  
+  #Michelle's notes
+  # The final step in the process involves converting the results from JSON format to something
+  # easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+  # easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+  
+  
+  # Convert JSON response to a dataframe
+  response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+  
+  print(response)
+  # Inspect the dataframe
+  #str(response.df, max.level = 3)
+  
+  # Notice that the really important element of the list is "response" that has all the elements that we want
+  response.df <- response.df$response
+  #str(response.df)
+  
+  # But it has more elements with different sizes...
+  #View(response.df$docs) # Weird... only 10 news pieces
+  
+  
+  #tiles = response.df$docs %>% select("abstract")
+  #View(tiles)
+  #Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+  #Nvm, I was looking at the abstract
+  #I think I should be looking at the variable called "headline.main".
+  #This column mentions Israel all 10 times. 
+  #Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+  
+  # Get number of hits
+  #Assign this and the year to the appropriate row of the data frame
+  hits_value = response.df$meta$hits
+  yr_value = yr
+  the_hits_results = rbind(the_hits_results, data.frame(yr_range = yr_value, hits_range = hits_value))
+  
+  print(yr)
+  print(response.df$meta$hits) # x articles that mention Israel?
+  #But only 38909 articles have Israel in the headline (2013 to 2023)
+  #Figure this out. That's basically right
+  
+  #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+  
+}
+
+
+print(the_hits_results)
+
+
+
+
+plot(the_hits_results$yr_range, the_hits_results$hits_range)
+
+the_is_time = lm(hits_range ~ yr_range, data = the_hits_results)
+
+
+summary(the_is_time)
+
+
+
+
+
+
+```
+
+
+
+
+```{r}
+#Repeat with a word that should not increase or decrease with time
+#It might increase with time, but we actually want to normalize by world news coverage. 
+#Try "World"
+
+
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "SRU0lRN1GhfLR0hm6NAINLq9MvY1NXt6" #My API key  #This is the only line that changes, I think
+response.format<-".json"
+
+#These also need to be modified
+search.term<-"'World'"
+filter.query<-"headline:\"\'World\'\""
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Initialize empty data frame
+
+the_hits_results = data.frame(yr_range = numeric(), 
+                          hits_range = numeric(),
+                          stringsAsFactors = FALSE)
+
+
+for (yr in 1961:2023){
+  
+  get.request<-paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                      "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=", yr, "0101&end_date=", yr, "1231", "&api-key=", nytimeskey)
+  #Print out the get request
+  print(get.request)
+  
+  # Now let's just grab it!
+  response<-httr::GET(url = get.request)
+  print(response)
+  str(response)
+  
+  #Michelle's notes
+  # The `content() function allows us to extract the html response in a format of our choosing 
+  # (raw text, in this case):
+  
+  # Inspect the content of the response, parsing the result as text
+  response<-httr::content(x = response, as = "text")
+  #Warning message: "No encoding supplied: defaulting to UTF-8"
+  #I don't think this is an issue so I'm just going to ignore it
+  substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+  
+  #Michelle's notes
+  # The final step in the process involves converting the results from JSON format to something
+  # easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+  # easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+  
+  
+  # Convert JSON response to a dataframe
+  response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+  
+  print(response)
+  # Inspect the dataframe
+  #str(response.df, max.level = 3)
+  
+  # Notice that the really important element of the list is "response" that has all the elements that we want
+  response.df <- response.df$response
+  #str(response.df)
+  
+  # But it has more elements with different sizes...
+  #View(response.df$docs) # Weird... only 10 news pieces
+  
+  
+  #tiles = response.df$docs %>% select("abstract")
+  #View(tiles)
+  #Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+  #Nvm, I was looking at the abstract
+  #I think I should be looking at the variable called "headline.main".
+  #This column mentions Israel all 10 times. 
+  #Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+  
+  # Get number of hits
+  #Assign this and the year to the appropriate row of the data frame
+  hits_value = response.df$meta$hits
+  yr_value = yr
+  the_hits_results = rbind(the_hits_results, data.frame(yr_range = yr_value, hits_range = hits_value))
+  
+  print(yr)
+  print(response.df$meta$hits) # x articles that mention Israel?
+  #But only 38909 articles have Israel in the headline (2013 to 2023)
+  #Figure this out. That's basically right
+  
+  #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+  
+}
+
+
+print(the_hits_results)
+
+
+
+
+plot(the_hits_results$yr_range, the_hits_results$hits_range)
+
+the_is_time = lm(hits_range ~ yr_range, data = the_hits_results)
+
+
+summary(the_is_time)
+
+
+
+
+
+
+```
+
+
+
+
+
+```{r}
+#It seems that the plurality of pieces concerning Israel-Palestine come from the "Foreign" news desk
+#So we can just look at number of foreign news desk articles over time. 
+#The key parameter of interest is articles mentioning IPC divided by foreign desk articles for each year. 
+
+
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "SRU0lRN1GhfLR0hm6NAINLq9MvY1NXt6" #My API key  #This is the only line that changes, I think
+response.format<-".json"
+
+#These also need to be modified
+#search.term<-"'Palestinian'"
+filter.query <- "news_desk:(\"Foreign\", \"Foreign Desk\")"
+
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+#search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+#print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Initialize empty data frame
+
+foreign_hits_results = data.frame(yr_range = numeric(), 
+                          hits_range = numeric(),
+                          stringsAsFactors = FALSE)
+
+
+for (yr in 1961:2023){
+  
+  get.request<-paste0(api_base.url, 
+                    response.format, "?",
+                      "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=", yr, "0101&end_date=", yr, "1231", "&api-key=", nytimeskey)
+  #Print out the get request
+  print(get.request)
+  
+  # Now let's just grab it!
+  response<-httr::GET(url = get.request)
+  #print(response)
+  str(response)
+  
+  #Michelle's notes
+  # The `content() function allows us to extract the html response in a format of our choosing 
+  # (raw text, in this case):
+  
+  # Inspect the content of the response, parsing the result as text
+  response<-httr::content(x = response, as = "text")
+  #Warning message: "No encoding supplied: defaulting to UTF-8"
+  #I don't think this is an issue so I'm just going to ignore it
+  substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+  
+  #Michelle's notes
+  # The final step in the process involves converting the results from JSON format to something
+  # easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+  # easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+  
+  
+  # Convert JSON response to a dataframe
+  response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+  
+  #print(response)
+  # Inspect the dataframe
+  #str(response.df, max.level = 3)
+  
+  # Notice that the really important element of the list is "response" that has all the elements that we want
+  response.df <- response.df$response
+  #str(response.df)
+  
+  # But it has more elements with different sizes...
+  #View(response.df$docs) # Weird... only 10 news pieces
+  
+  
+  #tiles = response.df$docs %>% select("abstract")
+  #View(tiles)
+  #Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+  #Nvm, I was looking at the abstract
+  #I think I should be looking at the variable called "headline.main".
+  #This column mentions Israel all 10 times. 
+  #Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+  
+  # Get number of hits
+  #Assign this and the year to the appropriate row of the data frame
+  hits_value = response.df$meta$hits
+  yr_value = yr
+  foreign_hits_results = rbind(foreign_hits_results, data.frame(yr_range = yr_value, hits_range = hits_value))
+  
+  print(yr)
+  print(response.df$meta$hits) # x articles that mention Israel?
+  #But only 38909 articles have Israel in the headline (2013 to 2023)
+  #Figure this out. That's basically right
+  
+  #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+  
+}
+
+
+print(foreign_hits_results)
+
+fhr_only = foreign_hits_results %>% subset(yr_range > 1981)
+
+
+
+
+plot(fhr_only$yr_range, fhr_only$hits_range)
+
+foreign_is_time = lm(hits_range ~ yr_range, data = fhr_only)
+
+
+summary(foreign_is_time)
+
+
+
+
+
+
+```
+
+
+Takeaways from the analysis of whether mentions of IPC should naturally increase over time without increased focus:
+(For example, more articles overall, or more articles in foreign desk overall)
+
+More articles overall?
+- When looking at the word "Winter", there is only a marginally significant increase in its headline incidence over the period 1961-2023. 
+- Results, if anything, should be biased in the positive direction, since "Winter" is related to climate change.
+- Thus, there is either no change at all over time, or only a marginally significant increase in articles. 
+
+
+More articles in the foreign desk?
+- When only looking at the "Foreign" desk (not the "Foreign Desk" desk), results only exist from 2006-2024. 
+- During this period, there was a statistically insignificant decrease in number of foreign desk items
+- Thus, clearly no increase over time
+- When looking at the "Foreign Desk" or "Foreign" desks, we see results from the years 1981-2024.
+- During this period, there was also a marginally significant decrease in number of foreign desk items
+- Thus, I think it is safe to say there was no increase in foreign desk coverage over time. 
+
+
+
+To be extra sure, I also check the "Washington" and "OpEd" news desks below
+- This actually does yield statistically significant results
+- Articles notably increase with time from 1981-2023. 
+- So we probably should control for time. 
+
+
+```{r}
+#Some pieces concerning Israel-Palestine also come from the "Washington" and "OpEd" news desks
+#Let's look at all possibly relevant news desks over time
+#Was there any volumetric increase across all of these desks?
+#If so, we must control for time in our analysis.
+#If not, then time is irrelevant to the total number of articles that could mention IPC
+#So we can just look at IPC mentions over time. 
+
+
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "SRU0lRN1GhfLR0hm6NAINLq9MvY1NXt6" #My API key  #This is the only line that changes, I think
+response.format<-".json"
+
+#These also need to be modified
+#search.term<-"'Palestinian'"
+filter.query <- "news_desk:(\"Foreign\", \"Foreign Desk\", \"Washington\", \"OpEd\")"
+
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+#search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+#print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Initialize empty data frame
+
+desk_hits_results = data.frame(yr_range = numeric(), 
+                          hits_range = numeric(),
+                          stringsAsFactors = FALSE)
+
+
+for (yr in 1961:2023){
+  
+  get.request<-paste0(api_base.url, 
+                    response.format, "?",
+                      "&fq=", filter.query, "&facet_fields=source&facet_filter=true&begin_date=", yr, "0101&end_date=", yr, "1231", "&api-key=", nytimeskey)
+  #Print out the get request
+  #print(get.request)
+  
+  # Now let's just grab it!
+  response<-httr::GET(url = get.request)
+  #print(response)
+  #str(response)
+  
+  #Michelle's notes
+  # The `content() function allows us to extract the html response in a format of our choosing 
+  # (raw text, in this case):
+  
+  # Inspect the content of the response, parsing the result as text
+  response<-httr::content(x = response, as = "text")
+  #Warning message: "No encoding supplied: defaulting to UTF-8"
+  #I don't think this is an issue so I'm just going to ignore it
+  substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+  
+  #Michelle's notes
+  # The final step in the process involves converting the results from JSON format to something
+  # easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+  # easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+  
+  
+  # Convert JSON response to a dataframe
+  response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+  
+  #print(response)
+  # Inspect the dataframe
+  #str(response.df, max.level = 3)
+  
+  # Notice that the really important element of the list is "response" that has all the elements that we want
+  response.df <- response.df$response
+  #str(response.df)
+  
+  # But it has more elements with different sizes...
+  #View(response.df$docs) # Weird... only 10 news pieces
+  
+  
+  #tiles = response.df$docs %>% select("abstract")
+  #View(tiles)
+  #Seems like we are currently getting any hits that mention Israel at all, not just in the headline.
+  #Nvm, I was looking at the abstract
+  #I think I should be looking at the variable called "headline.main".
+  #This column mentions Israel all 10 times. 
+  #Fortunately it also gets mentions of "Israel's" not just the word "Israel". 
+  
+  # Get number of hits
+  #Assign this and the year to the appropriate row of the data frame
+  hits_value = response.df$meta$hits
+  yr_value = yr
+  desk_hits_results = rbind(desk_hits_results, data.frame(yr_range = yr_value, hits_range = hits_value))
+  
+  print(yr)
+  print(response.df$meta$hits) # x articles that mention Israel?
+  #But only 38909 articles have Israel in the headline (2013 to 2023)
+  #Figure this out. That's basically right
+  
+  #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+  
+}
+
+
+print(desk_hits_results)
+
+desk_hr_only = desk_hits_results %>% subset(yr_range > 1981)
+
+
+
+
+plot(desk_hr_only$yr_range, desk_hr_only$hits_range)
+
+desk_is_time = lm(hits_range ~ yr_range, data = desk_hr_only)
+
+
+summary(desk_is_time)
+
+
+
+
+
+
+```
+
+
+
+
+We now have a measure of press focus on the IPC over time. 
+
+hits_results contains the number of headline mentions of "Palestinian" over time
+hits_israel_results contains the number of headline mentions of "Israel" per year. 
+
+We also have a measure of Palestinian death counts, courtesy of B'Tselem.
+They have a data frame with every Palestinian killed since 2000.
+
+These are the independent variables:
+- NYT headline mentions of "Palestinian" 1961-2023 (lagged -1 year?)
+- NYT headline mentions of "Israel" 1961-2023 (lagged -1 year?)
+- Palestinian death count 2000-2023 (lagged -1 year?)
+
+
+The dependent variables of interest are as follows.
+- UNGA Resolutions criticizing (mentioning) Israel
+- Amnesty International percent focus on Israel in annual report
+- Human Rights Watch percent focus on Israel in annual report
+
+
+
+Time to see if any of the independent variables explain yearly variation in the DVs. 
+
+
+
+
+
+```{r}
+
+
+#Download the data on Amnesty mentions over time
+amnesty_all_data = read.csv("C:/Users/OSU/UCLA/UCLA Quarter IV/AmnestyMentions.csv")
+
+#Add a column for year covered (distinct from year of report)
+
+aad = amnesty_all_data %>% mutate(year_covered = Year - 1)
+
+#Look at just Israel
+
+israel_over_time = aad %>% subset(Country == "Israel")
+
+#Plot focus on Israel over time
+library(ggplot2)
+
+# Using ggplot2
+ggplot(israel_over_time, aes(x = Year)) +
+  geom_line(aes(y = pct_fq4, color = "pct_fq4"), size = 1) +
+  geom_line(aes(y = pct_fq5, color = "pct_fq5"), size = 1) +
+  labs(x = "Time", y = "Percent Focus", title = "Focus on Israel over time (Amnesty)") +
+  scale_color_manual(values = c("pct_fq4" = "red", "pct_fq5" = "blue")) +
+  theme_minimal()
+
+
+#Results are actually quite similar across the two different counts
+
+
+
+
+
+
+
+
+
+#First test: Palestinian death count from B'Tselem:
+
+#Data from Oct 5 2001 to Oct 5 2023
+#Notably ends right before Ocotber 7th: 
+
+#Read in BTS data
+
+bts = read.csv("C:/Users/OSU/UCLA/UCLA Quarter V/BTselem Palestinian Fatalities from Oct 5 2001 to Oct 5 2023.csv")
+
+library(lubridate)
+
+
+#Are date of event and date of death different?
+
+# Calculate the number of rows with different values for var1 and var2
+num_different <- sum(bts$Date.of.event != bts$Date.of.death, na.rm = TRUE)
+# Print the result
+print(num_different)
+
+
+bts_different <- bts[bts$Date.of.event != bts$Date.of.death, ]
+# Print the resulting subset
+print(bts_different)
+
+#There are 868 / 10,000 entries in which the dates differ
+#Date of event appears to be the day in which the victim was mortally wounded
+#And date of death is the day they died. 
+#They sometimes differ by a couple weeks, but usually only by a day or two 
+#Date of death always occurs later, obviously.
+#Seems okay to use either
+#International attention is probably drawn to the event, but perhaps to the death as well.
+#Here, I'll use event, but I'm sure either would yield virtually identical results. 
+
+
+
+
+
+
+# Convert the "Date.of.death" column to Date format
+bts$Date.of.event <- mdy(bts$Date.of.event)
+
+# Extract the year and create the "year_of_death" column
+bts$year_of_death <- year(bts$Date.of.event)
+
+
+#Create data frame of number of deaths per year
+
+deaths_per_year = count(bts$year_of_death)
+
+
+#Drop 2023 since no amnesty report yet (as of 3/12/2024)
+#Also drop 2001 since only part of year covered
+dpy_current = deaths_per_year %>% subset(x < 2023 & x > 2001)
+
+#Join with amnesty data (aad)
+#year is called "x" in deaths_per_year, called "year_covered" in aad
+
+
+# Perform inner join based on the respective year variables
+bts_amnesty_israel <- merge(israel_over_time, dpy_current, by.x = "year_covered", by.y = "x")
+
+
+
+#Plots
+
+ggplot(bts_amnesty_israel, aes(x = year_covered)) +
+  geom_line(aes(y = pct_fq4, color = "pct_fq4"), size = 1) +
+  geom_line(aes(y = pct_fq5, color = "pct_fq5"), size = 1) +
+  geom_line(aes(y = freq/max(freq), color = "Death count ratio")) +
+  labs(x = "Time", y = "Percent Focus", title = "Amnesty Focus and Palestinian Death Count") +
+  scale_color_manual(values = c("pct_fq4" = "red", "pct_fq5" = "blue", "Death count ratio" = "green")) +
+  theme_minimal()
+
+#Run regression of frequency (pct_fq4 and pct_fq5) on death count (freq)
+
+#Currently, I have these as logged. Not sure if it matters, but good to check with Jeff or Chad.
+
+btsai_4 = lm(pct_fq4 ~ log(freq), data = bts_amnesty_israel)
+
+summary(btsai_4)
+
+
+btsai_5 = lm(pct_fq5 ~ log(freq), data = bts_amnesty_israel)
+
+summary(btsai_5)
+
+#Moment of Truth (part 1)
+#According to both models, there is no correlation between death count and Amnesty percent focus
+
+#What about on raw mentions?
+
+#I'm pretty sure these shouldn't be logged, since both are on similar scale. 
+
+btsai_4_m = lm(Frequency4 ~ freq, data = bts_amnesty_israel)
+
+summary(btsai_4_m)
+
+
+btsai_5_m = lm(Frequency5 ~ freq, data = bts_amnesty_israel)
+
+summary(btsai_5_m)
+
+#Still no
+
+
+
+
+
+
+
+
+
+
+
+#Next analysis: NYT mentions.
+
+
+#Look at "Palestinian" first
+
+#hits_results data frame
+#Double check to make sure this is the right one.
+
+#Remove 2023 from hits_results
+
+nyt_pal_current = hits_results %>% subset(yr_range < 2023)
+
+# Perform inner join based on the respective year variables
+nyt_amnesty_israel <- merge(israel_over_time, nyt_pal_current, by.x = "year_covered", by.y = "yr_range")
+
+
+
+
+
+#Plots
+
+ggplot(nyt_amnesty_israel, aes(x = year_covered)) +
+  geom_line(aes(y = pct_fq4, color = "pct_fq4"), size = 1) +
+  geom_line(aes(y = pct_fq5, color = "pct_fq5"), size = 1) +
+  geom_line(aes(y = hits_range/max(hits_range), color = "hits_range")) +
+  labs(x = "Time", y = "Percent Focus", title = "Amnesty Focus and NYT hits for \"Palestinian\"") +
+  scale_color_manual(values = c("pct_fq4" = "red", "pct_fq5" = "blue", "hits_range" = "green")) +
+  theme_minimal()
+
+
+
+
+
+
+#Run regression of frequency (pct_fq4 and pct_fq5) on NYT headline mentions of "Palestine" (hits_range)
+#Control for year (increase in articles with time)
+
+nytai_4 = lm(pct_fq4 ~ hits_range + year_covered, data = nyt_amnesty_israel)
+
+summary(nytai_4)
+
+#Hits_range is statistically significant
+#Year is not
+#In direction expected - more hits = more mentions (positive)
+
+#However, if we log the hits_range variable, it is no longer significant
+#And year_covered becomes marginally significant. 
+#Should we log this variable?
+
+
+nytai_5 = lm(pct_fq5 ~ hits_range + year_covered, data = nyt_amnesty_israel)
+
+summary(nytai_5)
+
+
+#Neither is significant
+#Still positive though
+
+
+
+#What if we don't control for year?
+
+
+nytai_5_simple = lm(pct_fq5 ~ hits_range, data = nyt_amnesty_israel)
+
+summary(nytai_5_simple)
+
+
+#Still nothing
+#Still positive though
+
+
+
+
+
+#Conclusion: 
+#NYT headline mentions of "Palestinian" is positively correlated with Amnesty mentions
+#The relationship is significant in some models, but not in others (not robust). 
+
+
+
+
+
+
+
+
+
+
+
+
+#Look at NYT headline mentions of "Israel" vs. Amnesty mentions of Israel
+
+#Remove 2023 from hits_results
+
+nyt_isr_current = hits_israel_results %>% subset(yr_range < 2023)
+
+# Perform inner join based on the respective year variables
+nyt_head_isr <- merge(israel_over_time, nyt_isr_current, by.x = "year_covered", by.y = "yr_range")
+
+
+
+#Plots
+
+ggplot(nyt_head_isr, aes(x = year_covered)) +
+  geom_line(aes(y = pct_fq4, color = "pct_fq4"), size = 1) +
+  geom_line(aes(y = pct_fq5, color = "pct_fq5"), size = 1) +
+  geom_line(aes(y = hits_range/max(hits_range), color = "hits ratio")) +
+  labs(x = "Time", y = "Percent Focus", title = "Amnesty Focus and NYT hits for \"Israel\"") +
+  scale_color_manual(values = c("pct_fq4" = "red", "pct_fq5" = "blue", "hits ratio" = "green")) +
+  theme_minimal()
+
+
+
+nytai_i_4 = lm(pct_fq4 ~ hits_range + year_covered, data = nyt_head_isr)
+
+summary(nytai_i_4)
+
+
+#Again, the results are statistically significant at the p = 0.001 level.
+#The correlation is in the expected direction (positive between hits and mentions)
+
+#And, even when we log the hits_range variable, we still get a significant result
+#The direction is the same
+#However, the result is only significant at the p = 0.05 level. 
+
+
+nytai_i_5 = lm(pct_fq5 ~ hits_range + year_covered, data = nyt_head_isr)
+
+summary(nytai_i_5)
+
+#Again, the results are insignificant for pct_fq_5
+#Whether logged or not. 
+#But positive either way. 
+
+
+
+nytai_i_5_simple = lm(pct_fq5 ~ log(hits_range), data = nyt_head_isr)
+
+summary(nytai_i_5_simple)
+
+
+#Insignificant when logged or not
+#Positive either way
+
+
+
+nytai_i_raw_5 = lm(Frequency5 ~ hits_range + year_covered, data = nyt_head_isr)
+
+summary(nytai_i_raw_5)
+
+#Insignificant (but year is)
+
+
+nytai_i_raw_4 = lm(Frequency4 ~ hits_range + year_covered, data = nyt_head_isr)
+
+summary(nytai_i_raw_4)
+
+#Here, results actually are significant. 
+#Both hits_range and year_covered are significant and positive. 
+#Same results when hits_range is logged. 
+
+
+
+
+
+
+
+
+#Next thing to check:
+#Is the media attentive to death counts?
+#Look at correlation between death count and NYT mentions.
+
+
+
+#Next thing to check (Connor's idea):
+#Look at Israeli death counts instead of Palestinian. 
+
+
+
+
+```

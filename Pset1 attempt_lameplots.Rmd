@@ -1,0 +1,611 @@
+---
+title: "Pset 1 209 Goetz"
+author: "Josh Goetz"
+date: "2023-10-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#library(knitr)
+```
+
+Link to Dropbox folder with pictures from Exercise 1: https://www.dropbox.com/scl/fo/ekpc4qjys7bh2zsobyn7d/h?rlkey=ylsgmshlbb9xq0k0fweznrok4&dl=0 
+
+```{r}
+#Big Loop attempt:
+
+#Load libraries:
+library(RSelenium) #Use for webscraping
+library(wdman) #Use to determine available versions of Chrome
+library(netstat) #Use for free_port function
+library(rvest) #Seems important
+library(httr)  #Necessary for reading html?
+library(stringr) #Use for substring function (str_sub)
+library(dplyr) #Use everyday like an umbrella in Seattle
+
+#Base URL
+url <- "https://www.pewresearch.org/formats/short-read/"
+
+#Initialize remote driver and open it
+remote_driver = rsDriver(browser = "firefox", chromever = NULL, port = free_port())
+remDr = remote_driver$client
+remDr$open()
+
+#Initialize empty objects for loop
+url_full = NULL
+
+col_images = NULL
+col_links = NULL
+col_previews = NULL
+col_dates = NULL
+col_titles = NULL
+#Images: images_oxi_clean
+#Links: article_links
+#Text_preview: des_oxi_clean
+#Dates: extracted_dates
+#Titles: titles
+
+
+#Loop over all 10 pages:
+for (i in 1:10) {
+  #For pages 2 to 10, append the suffix to the base url
+  #For page 1, the url is the base url
+  if (i == 1){
+    url_full = url
+  }
+  else{
+  suffix_i = paste0("page/", i, "/")
+  url_full = paste0(url, suffix_i)
+  }
+  
+  #Navigate to URL (specific page of results)
+  
+  #I realize this is an inefficient way of navigating
+  #But my code was breaking when I did it the proper way
+  
+  #Proper way: The following lines should be outside the loop
+  remDr = remote_driver$client
+  remDr$open()
+  print(url_full)
+  
+  #Proper way: Only this line should be inside the loop
+  remDr$navigate(url_full)
+  
+  #Get html code of specific page of results
+  html_source <- remDr$getPageSource()
+  #read html code
+  target_page <- read_html(html_source[[1]])
+  target_page
+  
+  #Find the bin that contains necessary info on articles
+  #In this case, the bin/node is called "article"
+  stories <- target_page %>% html_nodes("article")
+  stories %>% html_text()
+  
+  
+  
+  #Get all titles
+  headers = stories %>% html_nodes("h2.header.medium")
+  #Use the html_text function to extract the "#text" part of the html code
+  titles <- headers %>% html_text()
+  titles
+
+  #Get all the dates
+  dates = stories %>% html_nodes("div.meta")
+  #dates
+  #Pattern: every string contains the date inside >< and after the word '"date"' in quotes
+  #Extract the date by exploiting this pattern
+  #Note: I used ChatGPT for help with the R syntax
+  #This is how I understand it:
+  #.* means any set of characters, so it is put at the beginning and end
+  #^< means any character other than "<"
+  #[^>]+ selects all text other than "<" that is in between ">" and "<"
+  extracted_dates <- gsub('.*"date">([^<]+)<.*', '\\1', dates)
+  extracted_dates
+  
+  #Wait I think I made that way harder than it needed to be
+  #Use the drop-down arrows on the html code as much as possible
+  #Second attempt
+  #dates2 = stories %>% html_nodes("span.date")
+  #dates2
+  #nvm that didn't really help that much
+  
+  #Get all descriptions
+  descriptions = stories %>% html_nodes("div.description")
+  #descriptions
+  #Remove beginning
+  descrip_clean = gsub('<div class="description">\n\t\t\t\t<p>', "", descriptions)
+  #descrip_clean
+  #Remove end
+  des_oxi_clean = sub("</p>\n\t\t\t</div>", "", descrip_clean)
+  des_oxi_clean
+  
+  # Get all the url links
+  links <- stories %>% html_nodes("a") # "a" contains the href link
+  #"a" also seems to contain the image, but it doesn't show up when I print "links"
+  #So that makes things easier. 
+  #links
+  #links[1]
+  #Pull out the link from all the nonsense
+  #i.e. get rid of "a", "href", etc.
+  links_links = links %>% html_attr("href")
+  #links_links
+  #For some reason everything is doubled, so just select the odd numbers
+  # Note: ChatGPT helped me with this syntax
+  #Starting from list element #1 and ending at the last element, select every other element of links_links
+  article_links <- links_links[seq(1, length(links_links), by = 2)]
+  article_links
+  
+  
+  
+  
+  
+  #Get all the image links
+  
+  
+  
+  images = stories %>% html_nodes("picture")
+  images = images %>% html_nodes("img")
+  #images
+  # Remove the unnecessary substring from each string
+  images_cleaned <- gsub("<img srcset=\"", "", images)
+  #images_cleaned
+  #Now there's still a bunch of junk at the end
+  
+  #Attempt #1 (failed)
+  # Remove everything after the first "png" or "jpg" occurrence in each string
+  #I used ChatGPT for syntax help here. 
+  #The "\\1" references back to either png or jpg, depending on which one ocurred.
+  #images_oxi_clean <- gsub("(.jpg|.png|.webp).*", "\\1", images_cleaned)
+  
+  #Attempt #2 (successful)
+  #Remove last 55 characters
+  images_oxi_clean = images_cleaned %>% str_sub(end = -55)
+  #images_oxi_clean <- gsub("?w=194&h=110&crop=1", "", images_cleaned)
+
+  #Attempt #3 (failed)
+  #images_oxi_clean[5[-4]]
+  #print(images_oxi_clean)
+  #for k in (1:length(images_oxi_clean)){
+  #  if 
+  #}
+  
+  #Download images - got help from Ananya on this part
+  #download.file(images)
+  #download.file(images, c(paste0("images-", seq(1, length(images)), ".jpg"))
+  #Set working directory to save images to
+  setwd("C:/Users/OSU/UCLA/UCLA Quarter IV/209/Pics from PSet 1") 
+  
+  #For every image, save to the image folder
+  #Save all as jpgs for consistency's sake
+  #All images should have identical names except the number
+  for (j in 1:length(images_oxi_clean)) {
+  image_url <- images_oxi_clean[j]
+  #Number will be the page number appended to the number on the page
+  #Surprisingly, this works quite well
+  filename <- paste0("image", i-1, j-1, ".jpg")
+  #Download the image
+  download.file(image_url, destfile = filename, mode = "wb")
+  #Display result in command window
+  cat(paste("Downloaded:", filename, "\n"))
+  }
+
+  #Add new data (from loop) into existing vectors
+  col_links = c(col_links, article_links)
+  col_previews = c(col_previews, des_oxi_clean)
+  col_dates = c(col_dates, extracted_dates)
+  col_titles = c(col_titles, titles)
+  col_images = c(col_images, images_oxi_clean)
+}
+
+#col_links
+#col_previews
+#col_dates
+#col_titles
+#col_images
+
+#Other column: ID (just make it numbers 1-100)
+#id = as.list(seq(1, 100))
+#Actually we want a vector instead of a list (see below)
+
+df_pew = data.frame(col_links, col_previews, col_dates, col_titles, col_images) # Put all of the above together
+id_v = seq(1, 100) #ID column
+df_6 <- cbind(id_v, df_pew) #Add ID column to data frame
+View(df_6)
+
+#Get image filepaths from where they are saved on my computer
+image_filepaths = NULL
+for (k in 0:9){
+  for (m in 0:9){
+    n = paste0(k, m)
+    image_filepaths[n] = paste0("C:/Users/OSU/UCLA/UCLA Quarter IV/209/Pics from PSet 1/image", k, m, ".jpg")
+  }
+}
+
+#Convert the filepaths vector to a data frame
+images_as_data = as.data.frame(image_filepaths)
+
+
+#Append image filepaths to data frame
+df_7 = cbind(df_6, images_as_data)
+
+#Remove image_links since it was not required by the assignment
+#"A designer knows they have acheived perfection not when there is nothing left to add...
+#...but when there is nothing left to take away"
+df_final = df_7 %>% select(-"col_images")
+
+#Woohoo! We're done!
+
+
+
+
+
+
+
+#remote_driver$server$stop
+
+
+```
+
+
+Discussion of LeBron API:
+
+To operationalize popularity, I chose to look at the number of articles that mention "LeBron James" in the headline. I initially tried to look at the number of articles that mention LeBron at all, but I realized this was led to the inclusion of articles that didn't really capture his popularity per se. For example, numerous articles that simply mentioned LeBron were actually about his son, Bronny James, Jr. In addition, it is difficult to justify the claim that someone is popular simply because they were mentioned in a news article - it may simply indicate that they were at one point famous enough to be worth referencing. A NYT article from 2022 could mention in passing a historical figure like Napoleon or Hitler, but this wouldn't mean that these men are "popular" in 2022. Headlines are much more clear indicators of popularity. Plus, if I'm being completely honest, it was a lot easier to scrape 200-odd articles with LeBron in the headline than 5928 articles that mentioned LeBron. 
+
+
+```{r}
+#LeBron API
+
+#Michelle's Instructions:
+# Go to:  http://developer.nytimes.com 
+# Create an account and sign-in
+# Click "My apps" from the drop-down menu in the top right corner
+# Click "New app"
+# Fill the name of an app (mine is MYAPPPOLI507)
+# Activate the different APIs services (click the + sign next to each service)
+# Click "Create" and voila!
+# Copy the access key and assign it to the "nytimeskey" variable below
+
+# Now let's some querys to the app *manually"
+# Because using Web APIs in R will involve repeatedly constructing different GET requests 
+# with slightly different components each time, it is helpful to store many of the individuals
+# components as objects and combine them using ```paste()``` when ready to send the request.
+
+# First, we know that every call will require us to provide:
+# a) a base URL for the API, 
+# b) some authorization code or key, and  
+# c) a format for the response.
+
+api_base.url<-"http://api.nytimes.com/svc/search/v2/articlesearch"
+nytimeskey <- "suR6N0jENY8AKipQPSfYJtHeVa0CWOrW" #My API key
+response.format<-".json"
+
+#Search term: "LeBron James"
+#We want this term to appear in the headline, not the body
+
+#Michelle's notes:
+#Note: Because of weird syntax issues, we need single quotes inside double quotes
+#And for the filter, we need \ before and after each quote. 
+#But for double quotes within double quotes, you apparently have to escape with / instead of \
+
+search.term<-"'LeBron James'"
+filter.query<-"headline:\"\'LeBron James\'\""
+
+
+print(filter.query) # How R stores the string
+cat(filter.query) # How R parses the string
+
+#Michelle's notes (converting search terms in English to search terms in URL language)
+# To overcome some of these encoding issues, it is often helpful to URL encode our strings. 
+# URL encoding basically translates punctuation marks, white space, and other non 
+# alphanumeric characters into a series of unique characters only recognizable by URL decoders.  
+# If you've ever seen %20 in a URL, this is actually a placeholder for a single space. 
+# R provides helpful functions to doing this translation automatically.  
+
+# URL-encode the search and its filters
+search.term<-URLencode(URL = search.term, reserved = TRUE)
+filter.query<-URLencode(URL = filter.query, reserved = TRUE)
+print(search.term)
+print(filter.query) #Now it's looking like some proper mumbo-jumbo!
+
+#Michelle's notes
+# Once all the pieces of our GET request are in place, we can use either the paste() or paste0()
+# to combine a number of different character strings into a single character string.  
+# [QUESTION: Difference between paste and paste0????] #Answer: Separator between added elements
+# This final string will be our URL for the GET request.
+
+#Alternative operationalization that I didn't pursue:
+#Another option: Look at articles published on Sunday only
+#Dates: facet_field=Sunday&facet=true&begin_date=20120101&end_date=20120101
+
+# Paste components together to create URL for get request
+get.request<-paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                    "&fq=", filter.query, "&facet_field=begin_date=20131009&end_date=20231009", "&api-key=", nytimeskey)
+#Print out the get request
+print(get.request)
+
+# Now let's just grab it!
+response<-httr::GET(url = get.request)
+print(response)
+str(response)
+
+#Michelle's notes
+# The `content() function allows us to extract the html response in a format of our choosing 
+# (raw text, in this case):
+
+# Inspect the content of the response, parsing the result as text
+response<-httr::content(x = response, as = "text")
+#Warning message: "No encoding supplied: defaulting to UTF-8"
+#I don't think this is an issue so I'm just going to ignore it
+substr(x = response, start = 1, stop = 1000) # Just shows you the characters from 1 to 1000
+
+#Michelle's notes
+# The final step in the process involves converting the results from JSON format to something
+# easier to work with -- notably a data.frame.  The ***jsonlite*** package provides several 
+# easy conversion functions for moving between JSON and vectors, data.frames, and lists.
+
+
+# Convert JSON response to a dataframe
+response.df<-jsonlite::fromJSON(txt = response, simplifyDataFrame = TRUE, flatten = TRUE)
+
+print(response)
+# Inspect the dataframe
+str(response.df, max.level = 3)
+
+# Notice that the really important element of the list is "response" that has all the elements that we want
+response.df <- response.df$response
+str(response.df)
+
+# But it has more elements with different sizes...
+View(response.df$docs) # Weird... only 10 news pieces
+
+# Get number of hits
+print(response.df$meta$hits) # 5928 articles mention LBJ
+#But only 297 articles have LBJ in the headline
+
+# Notice that the app only allows you to get 10 hits per request
+# Thus, we need to make (# of hits/10) calls (!!!)
+
+library(plyr)
+
+#Save response to the "docs" data frame
+docs <- response.df$docs
+print(class(docs)) #Confirm that docs is a data frame
+
+#Loop over full set of articles
+for(i in 1:27){
+  
+  #Create the search url
+ temp_get <- paste0(api_base.url, 
+                    response.format, "?", "q=", search.term, 
+                                 "&fq=", filter.query, "&api-key=", nytimeskey,
+                                 "&page=",i) 
+ 
+ #Grab the response
+ temp_response<-httr::GET(url = temp_get)
+ 
+ #Clean it up with functions and JSON
+ temp_response<-suppressMessages(httr::content(x = temp_response, as = "text"))
+ temp_response.df<-jsonlite::fromJSON(txt = temp_response, simplifyDataFrame = TRUE, flatten = TRUE)
+ 
+ #Create object with cleaned up response
+ temp_docs <- temp_response.df$response$docs
+ #docs[[i+1]] <- temp_docs
+ 
+ #Print class of newly-found articles
+ #If its "NULL", then the call returned nothing / didn't happen
+ #If its data frame, we're all good
+ print(class(temp_docs))
+ 
+ #Move this inside the loop
+ #Bind the newly-found documents to the larger data frame of documents
+ docs = rbind.fill(docs, temp_docs)
+ 
+ #Check class: Should be data frame
+ print(class(docs))
+ #print(class(docs[[i+1]]))
+ 
+ #Remove the results so you can fill them in again each time through the loop
+ rm(temp_get, temp_response, temp_docs)
+ print(paste("Round", i, ": success!!"))
+ 
+ #Thanks, Clayton!
+ #Sleep for 12 seconds, so that it does 5 pulls per minute
+ #Necessary b/c of API limit
+ Sys.sleep(12)
+ 
+
+}
+
+#Note: After running the code, I get the following error
+#"Error in exists(cacheKey, where = .rs.WorkingDataEnv, inherits = FALSE) : 
+#invalid first argument"
+#Nothing seems to change though, so I'm just going to ignore it
+
+sum(unlist(lapply(docs, function(x) nrow(x)))) # Check this!
+
+View(docs)
+#Success!
+
+
+
+#Subset this data set so it only includes articles that were published after October 12th, 2013. 
+
+library(lubridate)
+library(dplyr)
+
+#format dates properly
+docs_2 = docs %>% mutate(date = as.Date(pub_date))
+
+#Exclude articles published more than 10 years ago
+threshold = as.Date("2013-10-12")
+docs_3 = docs_2 %>% subset(date > threshold)
+
+
+#Decreasing order to check
+#docs_4 <- docs_3[order(docs_3$date, decreasing = TRUE), ]
+#Looks good
+
+#Choose months to examine popularity
+#There should be some interesting periodicity with the NBA season (e.g. playoffs)
+#By day would be too small - most days would be zero
+#By year would be too large - wouldn't be able to see more nuanced trends
+
+#First, add another column that counts topics as binary - sports or not
+docs_5 = docs_3 %>% mutate(sports_binary = case_when(docs_3$section_name == "Sports" ~ "Sports",
+                                                     docs_3$section_name != "Sports" ~ "Other"))
+
+#Create a date column that ignores publication day
+#That way we can filter by month more easily
+docs_6 = docs_5 %>%
+  mutate(month = format(date, "%Y-%m"))
+
+#Extract the number of articles from each month
+#Then merge this with the data frame to get a new column that counts total articles published each month
+library(dplyr)
+#str(docs_6)
+docs_7 = docs_6 %>% 
+  group_by(month) %>% 
+  summarise(articles_published = n())
+
+#Problem: The zeros are all left out 
+#Most months have 0 articles, but they should be included
+#Solution: Create a vector of all possible months in this data range
+#Then merge it with the existing data frame
+#Fill in NAs with 0s. 
+#Note: I got help from ChatGPT with the syntax for this part.
+
+# Create a data frame with all possible months
+all_months_df <- data.frame(month = format(seq.Date(as.Date("2013-10-01"), as.Date("2023-10-01"), by = "1 month"), "%Y-%m"))
+
+#Merge this with docs_7
+#Left join will ensure that unmatched months aren't deleted
+docs_8 <- left_join(all_months_df, docs_7, by = "month")
+
+# Replace NA values with 0s
+docs_8$articles_published[is.na(docs_8$articles_published)] <- 0
+
+#Add colors to the timeline, based on what team LeBron played for
+#Nvm, this didn't work
+#Try again: Get rid of dashes
+#A bit of a caveman approach but it seems to work
+#Idea is to convert date to a single number so that we can use < and > with case_when
+docs_10 = docs_8 %>% mutate(date_no_format = gsub("-", "", docs_8$month))
+#Anything below 201407 is black (Miami Heat)
+#Anything above 201807 is purple (LA Lakers)
+#Anything in the middle is red (Cleveland Cavs)
+docs_10 = docs_10 %>% mutate(color = case_when(docs_10$date_no_format < 201407 ~ "Heat",
+                                              docs_10$date_no_format > 201807 ~ "Lakers",
+                                              (docs_10$date_no_format >= 201407 & date_no_format <= 201807) ~ "Cavs"))
+
+
+#Plot using a bar plot
+
+#Put a good background on the plot
+
+library(imager)
+library(jpeg)
+library(png)
+library(ggplot2)
+library(ggpubr)
+#I hope this didn't just mess everything up
+
+#Load background image
+#You have to look closely - it's very transparent
+#dan = readPNG("C:/Users/OSU/UCLA/UCLA Quarter IV/209/DanGhost.png")
+
+#The actual data
+#Note: I got help from this website for the syntax
+#https://stackoverflow.com/questions/51255832/how-to-add-an-image-on-ggplot-background-not-the-panel
+over_time = ggplot(docs_10, aes(x = month, y = articles_published, fill = color)) +
+  #background_image(dan) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Popularity of LeBron James over the last Decade",
+    x = "Month",
+    y = "Number of NYT Articles Mentioning LeBron in Headline"
+  ) +
+  theme_minimal() +
+  theme(panel.grid = element_line()) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4)) + # Rotate x-axis
+   theme(
+    axis.title.x = element_text(color = "green"),
+    axis.title.y = element_text(color = "green"),
+    axis.text.x = element_text(color = "purple"),
+    axis.text.y = element_text(color = "purple")
+  )
+
+
+#over_time
+
+#Generate plot over time
+#over_time
+
+
+#Histogram of popularity by category
+
+docs_11 = docs_6 %>%
+  group_by(section_name) %>%
+  summarize(articles_published = n())
+
+docs_12 = docs_6 %>%
+  group_by(sports_binary) %>%
+  summarize(articles_published = n())
+
+
+#Other background picture (slighlty more relevant)
+#lebron_pic = readPNG("C:/Users/OSU/UCLA/UCLA Quarter IV/209/LBJ.png")
+
+
+over_topic <- ggplot(docs_11, aes(x = section_name, y = articles_published)) +
+  #background_image(lebron_pic) +
+   geom_col(fill = "skyblue", color = "black") +
+  labs(
+    title = "LeBron News Coverage by Category, Oct 2013 - Present",
+    x = "Categories",
+    y = "Article Count"
+  ) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8))  + # Rotate x-axis
+   theme(
+    axis.title.x = element_text(color = "green"),
+    axis.title.y = element_text(color = "green"),
+    axis.text.x = element_text(color = "purple"),
+    axis.text.y = element_text(color = "purple")
+   )
+#over_topic
+
+
+
+over_topic_2 <- ggplot(docs_12, aes(x = sports_binary, y = articles_published)) +
+  #background_image(lebron_pic) +
+   geom_col(fill = "orange", color = "black") +
+  labs(
+    title = "LeBron News Coverage by Category, Binary",
+    x = "Categories",
+    y = "Article Count"
+  ) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8))  + # Rotate x-axis
+   theme(
+    axis.title.x = element_text(color = "green"),
+    axis.title.y = element_text(color = "green"),
+    axis.text.x = element_text(color = "purple"),
+    axis.text.y = element_text(color = "purple")
+   )
+
+#over_topic_2
+
+#Plot graphs
+over_time
+over_topic
+over_topic_2
+
+
+#Animation
+#Not doing that
+
+
+```

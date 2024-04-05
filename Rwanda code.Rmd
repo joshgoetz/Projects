@@ -1,0 +1,1451 @@
+---
+title: "Rwanda"
+author: "Josh Goetz"
+date: "2023-11-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+#Remove stuff
+rm(list=ls())
+
+
+#Install readtext package to read Word documents
+#install.packages("readtext")
+library(readtext)
+
+
+
+#Set file path to word docs
+#Note: I had to do some ChatGPT witchcraft to work around the zip file issue
+#Apparently R has trouble when there's a zip file in the filepath
+#I deleted all that code since it just created a new folder on my computer
+#Now, we just need to do the following. 
+
+#Set working directory
+setwd("C:/Users/OSU/UCLA/UCLA Quarter IV/community interviews/community interviews")
+word_files <- list.files(pattern = "\\.docx$", full.names = TRUE)
+word_files
+# Read text from Word documents
+text_data <- readtext(word_files)
+```
+
+```{r}
+
+#Use regular expressions to remove the Interviewer's speech
+#Also remove the word "Respondent"
+
+
+# Create a new column 'text_only_resp' to store the modified text
+# text_data$text_only_resp <- ""
+# 
+# #Patterns for interviewer and respondent
+# #The lines don't always begin with those words
+# #Sometimes they being with "I:" and "P:" or other things
+# interviewer_pattern <- "^(I:|Jeannine:|Juventine:|Interviewer:).*$ "
+# respondent_pattern <- "^(R|Frank|Jacqueline|P|Respondent).*: "
+# 
+# # Iterate through each row in the data frame
+# for (i in 1:nrow(text_data)) {
+#   # Extract the document text
+#   doc_text <- text_data$text[i]
+#   
+#   # Remove lines starting with "Interviewer:"
+#   doc_text <- sub(interviewer_pattern, "", doc_text)#, flags =  re.MULTILINE)
+#   
+#   # Remove the word "Respondent:" from lines starting with "Respondent:"
+#   doc_text <- sub(respondent_pattern, "", doc_text)
+#   
+#   # Store the modified text in the 'text_only_resp' column
+#   text_data$text_only_resp[i] <- doc_text
+# }
+# 
+# # Print the modified data frame
+# print(text_data)
+
+
+
+
+
+# text1 = text_data$text[1]
+# #print(text1)
+# 
+# # Remove unwanted text
+# #Remove \n
+# #Then remove all of the interviewr's statements
+# #And all of the words "Interviewer" and "Respondent"
+# cleaned_text <- gsub("\n", "", text1, perl = TRUE)
+# cleaned_text <- gsub("Interviewer:.*?Respondent:|Respondent:.*?Interviewer:", "", cleaned_text, perl = TRUE)
+# cleaned_text <- gsub("I:.*?R:|R:.*?I:", "", cleaned_text, perl = TRUE)
+# cleaned_text <- gsub("I:.*?P:|P:.*?I:", "", cleaned_text, perl = TRUE)
+# cleaned_text <- gsub("Jeannine:.*?Frank:|Frank:.*?Jeannine:", "", cleaned_text, perl = TRUE)
+# cleaned_text <- gsub("Juventine:.*?Jacqueline:|Jacqueline:.*?Juventine:", "", cleaned_text, perl = TRUE)
+
+
+
+
+
+
+# 
+# #Patterns for interviewer and respondent
+# #The lines don't always begin with those words
+# #Sometimes they being with "I:" and "P:" or other things
+# interviewer_pattern <- "^(I:|Jeannine:|Juventine:|Interviewer:).*$ "
+# respondent_pattern <- "^(R|Frank|Jacqueline|P|Respondent).*: "
+
+
+
+text_data$text_only_resp <- ""
+
+# Iterate through each row in the data frame
+for (i in 1:nrow(text_data)) {
+  # Extract the document text
+  doc_text <- text_data$text[i]
+  
+  cleaned_text <- gsub("\n", "", doc_text, perl = TRUE)
+  cleaned_text <- gsub("Interviewer:.*?Respondent:|Respondent:.*?Interviewer:", "", cleaned_text, perl = TRUE)
+  cleaned_text <- gsub("I:.*?R:|R:.*?I:", "", cleaned_text, perl = TRUE)
+  cleaned_text <- gsub("I:.*?P:|P:.*?I:", "", cleaned_text, perl = TRUE)
+  cleaned_text <- gsub("Jeannine:.*?Frank:|Frank:.*?Jeannine:", "", cleaned_text, perl = TRUE)
+  filtered_lines <- gsub("Juventine:.*?Jacqueline:|Jacqueline:.*?Juventine:", "", cleaned_text, perl = TRUE)
+  
+  # Store the modified text in the 'text_only_resp' column
+  text_data$text_only_resp[i] <- filtered_lines
+}
+
+# Print the modified data frame
+print(text_data)
+
+
+
+
+#Check against some word documents:
+writeClipboard(text_data$text_only_resp[74])
+#Check is good. 96.1% Plagiarism using copyleaks.com
+#I can check this each time I go through the code to make sure it's 96.1%
+#Still good on second attempt - code is working
+
+
+#So the column text_only_resp in the data frame text_data is the one we need. 
+#Use this later. 
+
+
+
+
+
+#interviewer_pattern <- "^(I:|Jeannine:|Juventine:|Interviewer:).*$ "
+#respondent_pattern <- "^(R|Frank|Jacqueline|P|Respondent).*: "
+
+
+
+
+# cleaned_text <- gsub("Interviewer:", "", cleaned_text, perl = TRUE)
+# cleaned_text <- gsub("Respondent:", "", cleaned_text, perl = TRUE)
+# 
+# 
+# 
+# 
+# # Print the result
+# cat(cleaned_text)
+# print(cleaned_text)
+# 
+# 
+# cleaned_text1 <- gsub("Interviewer:.*?Respondent:", "", text1, perl = TRUE)
+# # Remove unwanted text
+# cleaned_text <- gsub("Interviewer:.*?Respondent:|Respondent:.*?Interviewer:", "", input_text, perl = TRUE)
+# 
+# # Print the result
+# cat(cleaned_text)print(cleaned_text1)
+# 
+# input_text <- "Interviewer: Let’s start with music. The music you may like. What famous music, let’s say last for 30 years as I hope you are more than 30 [both laugh]. What famous music from that time do you recall? Respondent: Shall I remember those songs? I do not think I can recall them now Interviewer: It is okay; we will talk about this if the songs come back in your mind Respondent: Yes. It is fine Interviewer: How old are you? Respondent: 42 Interviewer: Do you know how to read and write? Respondent: Yes, I do"
+# 
+# # Remove unwanted text
+# cleaned_text <- gsub("Interviewer:.*?Respondent:|Respondent:.*?Interviewer:", "", input_text, perl = TRUE)
+# 
+# # Print the result
+# cat(cleaned_text)
+# 
+# 
+# text_data$text_only_resp <- ""
+# 
+# #Patterns for interviewer and respondent
+# #The lines don't always begin with those words
+# #Sometimes they being with "I:" and "P:" or other things
+# interviewer_pattern <- "^(I:|Jeannine:|Juventine:|Interviewer:).*$ "
+# respondent_pattern <- "^(R|Frank|Jacqueline|P|Respondent).*: "
+# 
+# # Iterate through each row in the data frame
+# for (i in 1:nrow(text_data)) {
+#   # Extract the document text
+#   doc_text <- text_data$text[i]
+#   
+#   #Split into lines
+#   lines <- unlist(strsplit(doc_text, "\n"))
+#   
+#   # Remove lines starting with "Interviewer:"
+#   filtered_lines <- lines[!grepl("^Interviewer:", lines)]
+#   
+#   # Store the modified text in the 'text_only_resp' column
+#   text_data$text_only_resp[i] <- filtered_lines
+# }
+# 
+# # Print the modified data frame
+# print(text_data)
+# 
+# 
+# 
+# text <- "Interviewer: Let’s start with music. The music you may like. What famous music, let’s say last for 30 years as I hope you are more than 30"
+# 
+# # Split the text into lines
+# lines <- unlist(strsplit(text, "\n"))
+# 
+# # Remove lines starting with "Interviewer:"
+# filtered_lines <- lines[!grepl("^Interviewer:", lines)]
+# 
+# # Combine the remaining lines into a single string
+# filtered_text <- paste(filtered_lines, collapse = " ")
+# 
+# # Print the result
+# print(filtered_text)
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# library(utils)
+# writeClipboard(text_data$text[1])
+
+
+
+# print(text_data$text[1])
+# forme = text_data$text[1]
+
+
+
+# Create a data frame with the text data
+#text_df <- data.frame(id = seq_along(text_data), text = text_data$text)
+
+# Display the first few rows of the data frame
+#head(text_df)
+
+
+
+library(dplyr)
+#Read in file that contains the transcripts of Kagame's speeches
+#Note: This file contains 9 transcripts from 2009-2020 during Kwibuka
+#Set working directory to the folder containing this file
+setwd("C:/Users/OSU/UCLA/UCLA Quarter IV")
+
+#Read in files
+kagame = readtext("C:/Users/OSU/UCLA/UCLA Quarter IV/Kagame Speeches just text 2020 and before.docx")
+kagame$text_only_resp = kagame$text
+
+
+text_data_f2 = text_data %>% select(c("doc_id", "text", "text_only_resp"))
+
+#Combine interviewee text and kagame text into a single data frame
+
+
+#all_text contains all respondent text and kagame text in "text_only_resp" column
+all_text = rbind(text_data_f2, kagame)
+
+
+#Kagame corpus
+
+
+
+library(tm)
+library(stm)
+
+corpus.raw <- Corpus(DirSource("C:/Users/OSU/UCLA/UCLA Quarter IV/Kagame"))
+
+
+
+#The following code is adapted from Michelle Torres "06_TextAnalysis_I" file
+## make lower case
+corpus.prep <- tm_map(corpus.raw, content_transformer(tolower)) 
+corpus.prep[[1]]$content
+corpus.prep[[1]]$meta # metadata to edit
+
+
+
+## remove white space
+corpus.prep <- tm_map(corpus.prep, stripWhitespace) # and \n!
+corpus.prep[[1]]$content
+
+## remove punctuation 
+corpus.prep <- tm_map(corpus.prep, removePunctuation)
+corpus.prep[[1]]$content
+
+## remove numbers
+corpus.prep <- tm_map(corpus.prep, removeNumbers) 
+corpus.prep[[1]]$content
+
+# let's check stop words in english
+head(stopwords("english"), 20) # note the pronouns, can you think of cases where some of these
+# might be useful to retain?
+
+## remove stop words 
+corpus <- tm_map(corpus.prep, removeWords, stopwords("english")) # you can customize your list 
+corpus[[1]]$content
+
+k_words_no_stops = corpus$content
+
+
+
+
+k_all_words = unlist(strsplit(k_words_no_stops, "\\s+"))
+
+
+unique_words <- unique(k_all_words)
+
+# Convert to a vector
+unique_word_vector <- as.vector(unique_words)
+
+# Print the result
+#print(unique_word_vector)
+length(unique_word_vector)
+
+
+
+
+
+
+#unique_word_vector
+#A vector of unique words used by Paul Kagame in his speeches
+#A naive analysis will ignore frequency and just look this as a dictionary
+#Each interview will be scored based on it's use of words in the dictionary. 
+#See bottom section of code for this. 
+
+
+
+
+
+
+
+
+
+
+#Stemming is unncecessary here
+#Here we are just trying to create a dictionary of words used by Kagame
+
+## finally stem remaining words
+#corpus_stemmed <- tm_map(corpus, stemDocument) # Consider lemmatizing!
+#corpus_stemmed[[1]]$content
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Calculate Jaccard similarity between each interview and Kagame speeches
+#Note: The scores should be very low and probably all quite similar
+#Jaccard similarity does not account for word ordering. 
+#Idea: Choose the top 3-5 most similar interviews and manually check vs. Kagame
+#Using an online plagiarism checker. 
+#If no plagiarism here, probably no plagiarism anywhere. 
+
+#This might be useless, but let's see what happens:
+
+# Load the necessary packages
+# library(stringdist)
+# library(dplyr)
+# 
+# # Extract the speech text (row 75)
+# speech_text <- all_text$text[75]
+# 
+# # Create a function to calculate Jaccard similarity
+# calculate_jaccard_similarity <- function(text1, text2) {
+#   tokens1 <- unlist(strsplit(tolower(text1), "\\W+"))
+#   tokens2 <- unlist(strsplit(tolower(text2), "\\W+"))
+#   jaccard_sim <- stringdist::stringdistmatrix(tokens1, tokens2, method = "jaccard")
+#   return(1 - jaccard_sim)
+# }
+# 
+# # Apply the function to calculate Jaccard similarity for each interview
+# similarity_scores <- lapply(all_text$text[1:74], calculate_jaccard_similarity, text2 = speech_text)
+# 
+# # Convert the list of similarity scores to a data frame
+# similarity_df <- data.frame(
+#   Interview_ID = all_text$doc_id[1:74],
+#   Similarity_Score = unlist(similarity_scores)
+# )
+# 
+# # Display the results
+# print(similarity_df)
+# 
+# 
+# text_data[1,2]
+
+
+```
+
+
+
+```{r}
+#Grab speeches from Paul Kagame website
+#Speeches are on separate pages, but the URLs to the speeches
+#Are all on the first page of the search results for "Commemoration"
+
+#When I tried to open it, Firefox said it was a security risk
+#Therefore, instead of doing webscraping, I will just copy the text by hand. 
+
+#Ignore the code below (I'll comment it out)
+#Highlight the lines, click on Code on the R Menu, then click "Comment/Uncomment Lines"
+
+
+
+# library(RSelenium) #Use for webscraping
+# library(wdman) #Use to determine available versions of Chrome
+# library(netstat) #Use for free_port function
+# library(rvest) #Seems important
+# #rvest necessary for reading html content (e.g. tables)
+# library(httr)  #Necessary for reading html?
+# library(stringr) #Use for substring function (str_sub)
+# library(dplyr) #Use everyday like an umbrella in Seattle
+# 
+# #Base URL
+# #url <- "https://www.paulkagame.com/page/1/?s=commemoration&category_name=speech#038;category_name=speech"
+# 
+# 
+# #Initialize remote driver and open it
+# remote_driver = rsDriver(browser = "firefox", chromever = NULL, port = free_port())
+# remDr = remote_driver$client
+# remDr$open()
+# 
+# 
+# #Navigate to url
+# remDr$navigate(url)
+# 
+# #Get html code of specific page of results
+# html_source <- remDr$getPageSource()
+# #read html code
+# target_page <- read_html(html_source[[1]])
+# target_page
+# 
+# stories <- target_page %>% html_nodes("article")
+# stories %>% html_text()
+#     
+# #Initialize pk_speeches data frame to be filled with speech text
+# pk_speeches = NULL
+```
+
+
+
+
+
+```{r}
+#Let's try something extremely simple.
+
+#Using the Neil Caren code from Problem Set 4, create a "Kagame score" for each interview
+#Don't even both filtering out the interviewer text (assume it will wash out)
+
+
+
+#Instead of inside_vec_pos or inside_vec_neg
+#Here we use unique_word_vector
+
+
+#unique_word_vector
+
+#Remember, our document text is all in the body_text column of data frame "tnt"
+
+# Function to count positive and negative words in a document
+count_sentiment_words <- function(document, president_words) {
+  #Separate document into a bunch of words
+  #Might have to remove punctuation too, but let's not worry about that now. 
+  words <- unlist(strsplit(tolower(document), "\\s+"))
+  #Count number of words that match the positive and negative words
+  kagame_count <- sum(words %in% president_words)
+  
+  #Return positive and negative counts
+  #Counts = scores
+  #These are positive and negative scores
+  return(kagame_count = kagame_count)
+}
+
+# Apply the function to each document and add new columns to the data frame
+sentiment_count <- sapply(text_data$text, count_sentiment_words, unique_word_vector)
+
+#colnames(sentiment_count) <- "President Count"
+doc_data <- cbind(text_data, sentiment_count)
+
+
+#Right now, the sentiment count column just counts the number of inclusions
+#Probably extremely dependent on length of interview
+#Must normalize by interview word count
+#This gives us an idea of the % of overlap, which is what we really care about
+#Anyone who parrots the government might be more likely to give short responses anyway
+
+
+#Create a column that counts the number of words in the "text" column
+
+
+
+
+# Assuming your dataframe is called your_dataframe
+library(dplyr)
+
+# Add a new column "word_count" to your dataframe
+doc_data_wwc <- doc_data %>%
+  mutate(word_count = lengths(strsplit(as.character(text), "\\s+")))
+#Just checked with first interview and this works!
+#Word count is correct within 10 words margin of error. 
+
+
+
+#New column for percentage of matched words
+doc_data_wwc = doc_data_wwc %>%
+  mutate(pct_match = (sentiment_count / word_count)*100)
+
+
+
+
+#Arrange data frame so that the interviews with highest pct_match are at the top
+ddwwc_arranged = doc_data_wwc %>% arrange(desc(pct_match))
+
+#Plot distribution of pct_match for all interviews
+hist(ddwwc_arranged$pct_match, 
+     main = "Distribution of pct_match: Overlap between Interviews and Speeches",
+     xlab = "Percentage Match",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "black")
+
+```
+
+
+
+
+```{r}
+#Better version of the above analysis should use cosine similarity
+#Cosine accounts for word frequency, unlike Jaccard similarity
+
+
+#The code below is provided by ChatGPT and appears straightforward.
+#Notes about the method are enumerated below the code chunk.
+
+#The main thing that I need to do is create a document term matrix
+#This will include the 74 interviews as well as the Kagame speeches
+#Ideally the interview documents would only contain the responses
+#Thus, the following steps are necessary:
+#1. Remove interviewer lines
+
+#Done above
+#text_only_resp column of text_data data frame
+#text_only_resp column of all_text data frame also contains kagame speeches
+
+
+#2. Save truncated interviews as separate txt documents, like in Problem 1 of PSet 4
+
+library(jsonlite)
+library(dplyr)
+library(stringr)
+library(stm)
+library(SnowballC)
+library(tm)
+
+for (i in 1:nrow(all_text)) {
+  body <- all_text$text_only_resp[i]
+  title <- all_text$doc_id[i] %>%
+    str_replace_all(" ", "") %>%
+    str_replace_all("'", "") %>%
+    str_replace_all("/", "") %>%
+    str_replace_all("\\?", "") %>%
+    str_replace_all("|", "") %>%
+    str_replace_all(";", "") #%>%
+    #str_replace_all(".", "")
+
+  sink(paste0("C:/Users/OSU/UCLA/UCLA Quarter IV/rwandaDTMshort/doc_", title, ".txt"))
+  cat(body)
+  sink()
+}
+
+
+
+#3. Create dtm (also see problem 1). Make sure Kagame raw speeches are included
+
+corpus.good <- Corpus(DirSource("C:/Users/OSU/UCLA/UCLA Quarter IV/rwandaDTMshort"))
+
+
+
+#The following code is adapted from Michelle Torres "06_TextAnalysis_I" file
+## make lower case
+corpus.good_prep <- tm_map(corpus.good, content_transformer(tolower)) 
+corpus.good_prep[[1]]$content
+corpus.good_prep[[1]]$meta # metadata to edit
+
+
+
+## remove white space
+corpus.good_prep <- tm_map(corpus.good_prep, stripWhitespace) # and \n!
+corpus.good_prep[[1]]$content
+
+## remove punctuation 
+corpus.good_prep <- tm_map(corpus.good_prep, removePunctuation)
+corpus.good_prep[[1]]$content
+
+## remove numbers
+corpus.good_prep <- tm_map(corpus.good_prep, removeNumbers) 
+corpus.good_prep[[1]]$content
+
+# let's check stop words in english
+head(stopwords("english"), 20) # note the pronouns, can you think of cases where some of these
+# might be useful to retain?
+
+## remove stop words 
+corpus_dtm_good <- tm_map(corpus.good_prep, removeWords, stopwords("english")) # you can customize your list 
+corpus_dtm_good[[1]]$content
+
+## finally stem remaining words
+corpus_good_stem <- tm_map(corpus_dtm_good, stemDocument) # Consider lemmatizing!
+corpus_good_stem[[1]]$content
+
+
+
+
+### Let's build our Document-Term Matrix
+dtm_good <- DocumentTermMatrix(corpus_good_stem)
+dtm_good
+dtm_good$nrow
+dtm_good$ncol
+dtm_good$i
+
+
+#Reformat as matrix
+#Then reformat as data frame
+
+dtmx_good = as.matrix(dtm_good)
+dtmf_good = as.data.frame(dtmx_good)
+
+dim(dtmx_good)
+#This method (removing interviewer text) cut out 300 words
+#5166 columns now instead of 5466. 
+
+#4. Run code below from ChatGPT
+
+library(proxy)
+
+
+# Calculate cosine similarity between the first 74 rows and the last row
+#Actually, just do all rows to make it easier
+cosine_sim_good <- proxy::dist(dtmx_good[1:75, , drop = FALSE], dtmx_good[75, , drop = FALSE], method = "cosine")
+
+# Convert distance to similarity
+cosine_sim_good2 <- 1 - cosine_sim_good
+
+print(cosine_sim_good2)
+class(cosine_sim_good2)
+
+csimgood2 = as.vector(cosine_sim_good2)
+print(csimgood2)
+
+#Without Kagame's score
+csimgood3 = csimgood2[1:74]
+print(csimgood3)
+
+
+
+#Add this to data frame as column
+dtmf_scored <- data.frame(SimilarityScore = csimgood2, dtmf_good)
+
+#Arrange in descending order of similarity score. 
+dtmf_scored_arr = dtmf_scored %>% arrange(desc(SimilarityScore))
+#Remove Kagame speeches from dataset. 
+dtmf_final = dtmf_scored_arr %>% subset(round(SimilarityScore, digits = 1) != 1)
+
+#5. Plot distribution of results - look for any outliers.
+
+#Plot distribution of pct_match for all interviews
+hist(dtmf_final$SimilarityScore, 
+     main = "Distribution of Similarity Score: Overlap between Interviews and Speeches",
+     xlab = "Cosine Similarity Score",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "black")
+
+
+#Better plot
+par(bg = "skyblue")
+#Better graph courtesy of ChatGPT:
+hist(dtmf_final$SimilarityScore, 
+     main = "Distribution of Similarity Scores",
+     xlab = "Cosine Similarity Score",
+     ylab = "Frequency",
+     col = "gold",  # Change color to a shade of blue
+     border = "black",
+     #bg = "gold",
+     #xlim = c(0, 400),  # Set custom x-axis limits
+     breaks = 40,  # Adjust the number of breaks/bins
+     las = 1,  # Rotate x-axis labels for better readability
+     font.main = 1,  # Make main title bold
+     col.main = "#2c3e50",  # Change main title color
+     col.lab = "#34495e",  # Change axis label color
+     cex.main = 1.2,  # Increase main title font size
+     cex.lab = 1.1,  # Increase axis label font size
+     mgp = c(2.5, 1, 0),  # Adjust margin parameters for better label positioning
+     pch = 16,  # Use solid squares as the plotting character
+     mar = c(5, 4, 4, 2)  # Adjust the plot margins
+)
+
+
+#Look for outliers:
+z_score_good = scale(as.vector(dtmf_final$SimilarityScore))
+z_outs = which(abs(z_score_good) > 2)
+print(z_outs)
+
+#The top one is an outlier (anomolously similar)
+#The bottom two are also outliers (anomolously different)
+
+#Only care about top outlier, which is listed below: 
+#Flora0716022020.docx
+
+
+#Other way (same results)
+#z_scores <- scale(csimgood3)
+
+# Identify outliers based on Z-score (threshold, e.g., 2)
+#outliers <- which(abs(z_scores) > 2)
+#print(outliers)
+#Indices 4 and 6 are outliers
+
+
+
+
+
+#6. Put outliers through a plagiarism checker
+
+#Check this manually
+#Flora0716022020.docx vs. Kagame speeches
+#The picture of the comparison on copyleaks is saved to the computer
+#Filepath: "C:\Users\OSU\UCLA\UCLA Quarter IV\Rwanda interview plagiarism check.png"
+
+#What about other top few?
+#Juventine0714022020
+#Jeanine071412020
+
+
+
+
+#7. Report results: Is there anything fishy going on?
+
+#Results from Flora0716022020.docx
+#No
+
+#Results: 0% plagiarism
+#copyleaks.com found no evidence of any sort of plagiarism or even paraphrasing
+#Clearly the respondent is not copying the speeches
+#Doesn't really tell us if they aren't parroting the regime though
+#And definitely doesn't tell us that they aren't slightly shifting their responses. 
+
+#What about Juventine0714022020?
+#Also 0% plagiarism, 0% across the board
+#0% Identical, 0% Minor changes, 0% Paraphrased, 0% Omitted Words
+
+#What about Jeanine071412020?
+#Ran out of free checks on copyleaks for the day
+#Can try tomorrow
+
+#Overall takeaway: No direct copying of Kagame's speech 
+#Interpretation: No direct copying of regime talking points. 
+
+
+
+
+#8 - BONUS: 
+
+#Check graphically that similarity is uncorrelated with interviewer:
+
+
+#Create column of interviewer names
+#First, create column of doc_id
+
+library(tibble)
+
+dtmf_final_lab = dtmf_final
+
+#Change it so that the rowname column becomes a column itself
+#That way we can play around with it
+dtmf_final_lab <- rownames_to_column(dtmf_final_lab, var = "doc_id")
+
+ivr_name1 = substr(dtmf_final_lab$doc_id[1], 5, 8)
+
+                      
+dtmf_final_lab$ivr_id <- substr(dtmf_final_lab$doc_id, 5, 8)
+#This is the interviewer ID column
+dtmf_final_lab$ivr_id
+
+
+par(bg = "yellow")
+plot(1, type = "n",
+     xlab = "InterviewerID", ylab = "Similarity Score", main = "Effect of Interviewer ID")
+
+# Create a boxplot with blue points
+boxplot(dtmf_final_lab$SimilarityScore ~ dtmf_final_lab$ivr_id, 
+        col = "blue", add = TRUE, pch = 16)
+
+
+
+
+boxplot(dtmf_final_lab$SimilarityScore ~ dtmf_final_lab$ivr_id)
+
+
+
+
+
+#Run a regression
+#Is there a significant correlation between interviewer ID and similarity score?
+cosine_names = lm(SimilarityScore ~ ivr_id, data = dtmf_final_lab)
+summary(cosine_names)
+
+
+
+
+
+
+```
+
+
+```{r}
+# Other things to do:
+
+
+#   1. Caren sentiment analysis of interviews. 
+# This can help answer question 1 of research project
+# Ideally, this should also be done after removing interviewer lines
+
+caren_pos = read.csv("C:/Users/OSU/UCLA/UCLA Quarter IV/209/positive.csv")
+caren_neg = read.csv("C:/Users/OSU/UCLA/UCLA Quarter IV/209/negative.csv")
+
+
+
+#Do we want it as a data frame or as just a big chunk of text?
+#Or as a list?
+
+#Let's try as a vector
+vec_pos = as.vector(caren_pos)
+vec_neg = as.vector(caren_neg)
+
+inside_vec_neg = vec_neg$abandoned
+inside_vec_pos = vec_pos$abidance
+
+
+#Remember, our document text is all in the body_text column of data frame "tnt"
+
+# Function to count positive and negative words in a document
+count_sentiment_words <- function(document, positive_words, negative_words) {
+  #Separate document into a bunch of words
+  #Might have to remove punctuation too, but let's not worry about that now. 
+  words <- unlist(strsplit(tolower(document), "\\s+"))
+  #Count number of words that match the positive and negative words
+  positive_count <- sum(words %in% positive_words)
+  negative_count <- sum(words %in% negative_words)
+  
+  #Return positive and negative counts
+  #Counts = scores
+  #These are positive and negative scores
+  return(c(positive_count = positive_count, negative_count = negative_count))
+}
+
+# Apply the function to each document and add new columns to the data frame
+sentiment_counts <- t(sapply(all_text$text_only_resp, count_sentiment_words, inside_vec_pos, inside_vec_neg))
+colnames(sentiment_counts) <- c("positive_count", "negative_count")
+doc_scores <- cbind(all_text, sentiment_counts)
+
+
+#This data frame (doc scores) contains a column called "score_diff"
+#score_diff reports the positivity/negativity of each interview
+doc_scores = doc_scores %>% mutate(score_diff = positive_count - negative_count)
+
+pos_to_neg = doc_scores %>% arrange(desc(score_diff))
+summary(doc_scores$score_diff)
+
+
+#Graph it!
+#Plot distribution of pct_match for all interviews
+hist(doc_scores$score_diff, 
+     main = "Distribution of Sentiment Scores",
+     xlab = "Sentiment Score (+ = Positive, - = Negative)",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "black")
+
+par(bg = "gold")
+#Better graph courtesy of ChatGPT:
+hist(doc_scores$score_diff, 
+     main = "Distribution of Sentiment Scores",
+     xlab = "Sentiment Score (Higher = More Positive)",
+     ylab = "Frequency",
+     col = "#3498db",  # Change color to a shade of blue
+     border = "black",
+     #bg = "gold",
+     xlim = c(0, 400),  # Set custom x-axis limits
+     breaks = 40,  # Adjust the number of breaks/bins
+     las = 1,  # Rotate x-axis labels for better readability
+     font.main = 1,  # Make main title bold
+     col.main = "#2c3e50",  # Change main title color
+     col.lab = "#34495e",  # Change axis label color
+     cex.main = 1.2,  # Increase main title font size
+     cex.lab = 1.1,  # Increase axis label font size
+     mgp = c(2.5, 1, 0),  # Adjust margin parameters for better label positioning
+     pch = 16,  # Use solid squares as the plotting character
+     mar = c(5, 4, 4, 2)  # Adjust the plot margins
+)
+
+
+
+#Interesting findings
+#All scores are positive
+#Is this meaningful?
+#Yes. For PSet4, scores were often negative, and the mean was barely above zero
+#Here, we can tentatively conclude that the respondents generally are positive. 
+#Further proof of validity: Kagame's speech document has the 2nd highest (2nd most positive) score
+#Makes sense that it would be near the top
+#Since he is projecting a sense of unity and optimism
+
+#Manually check the lowest vs. highest score
+#See if there is a discernible difference in positivity
+#See if the lowest one is actually "positive" (based on my judgment)
+
+#Most positive: Jeanine071632020.docx (+374)
+#Most negative: Juventine0717012020.docx (+11) (still postive in absolute terms)
+
+
+writeClipboard(pos_to_neg$text_only_resp[1])
+
+writeClipboard(pos_to_neg$text_only_resp[75])
+
+
+#Interpretation from qualitative read:
+# Overall, these are the key differences:
+# - The more negative interview was significantly shorter
+# -	The more negative interview lacked banter/rapport with the interviewer
+# -	The more negative interview was slightly less aligned with the government 
+#   line than the more positive one (on some issues)
+#   o	Does the data on similarity confirm this?
+#Let's check:
+
+#We're looking for doc_Jeanine071632020.docx.txt
+#And doc_Juventine0717012020.docx.txt
+
+most_pos = dtmf_final_lab %>% subset(doc_id == "doc_Jeanine071632020.docx.txt")
+#0.5505
+most_neg = dtmf_final_lab %>% subset(doc_id == "doc_Juventine0717012020.docx.txt")
+#0.5590
+
+#No. 
+
+#Makes sense. Bag of words assumption should make that meaningless
+#Whatever. 
+
+
+
+
+
+
+
+
+#   2. Use metadata to see if the interviewer affects the sentiment
+# This should be easy because the final data frame will have
+# Both the sentiment score and the interviewer ID. 
+# #Need a new column that extracts the first 4 characters from doc_id row
+# #This will be interviewer_id column. 
+# #But the analysis will be easy
+# #Just throw a boxplot up there and see if the distributions and means overlap. 
+# #Could also do a regression to see if there are significant differences
+# #Its easy cause we will already have the IV and the DV. 
+
+#Plot results by interviewwer ID (John, Juventine, Jeannine, Flora)
+
+#Create interviewer ID column
+doc_scores_id = doc_scores
+doc_scores_id$ivr_id <- substr(doc_scores$doc_id, 1, 4)
+doc_scores_id = doc_scores_id %>% subset(ivr_id != "Kaga")
+
+
+doc_scores_id$word_count <- str_count(doc_scores_id$text_only_resp, "\\w+")
+
+
+
+#Plot the results to see what's going on
+boxplot(doc_scores_id$score_diff ~ doc_scores_id$ivr_id)
+
+
+par(bg = "lightyellow")
+#Better graph courtesy of ChatGPT:
+boxplot(doc_scores_id$score_diff ~ doc_scores_id$ivr_id, 
+     main = "Sentiment Scores by Interviewer ID",
+     xlab = "Interviewer Name (First 4 Letters)",
+     ylab = "Sentiment Score",
+     col = "blue",  # Change color to a shade of blue
+     border = "black",
+     #bg = "gold",
+     #xlim = c(0, 400),  # Set custom x-axis limits
+     ylim = c(0, 250),
+     #breaks = 40,  # Adjust the number of breaks/bins
+     las = 1,  # Rotate x-axis labels for better readability
+     font.main = 1,  # Make main title bold
+     col.main = "#2c3e50",  # Change main title color
+     col.lab = "#34495e",  # Change axis label color
+     cex.main = 1.2,  # Increase main title font size
+     cex.lab = 1.1,  # Increase axis label font size
+     mgp = c(2.5, 1, 0),  # Adjust margin parameters for better label positioning
+     pch = 16,  # Use solid squares as the plotting character
+     mar = c(5, 4, 4, 2)  # Adjust the plot margins
+)
+
+#Seems like John and Juventine elicit lower positivity scores
+#Are these differences significant?
+
+#Run a one-way ANOVA to see!
+anova_result <- aov(score_diff ~ ivr_id + word_count, data = doc_scores_id)
+
+# Summarize the ANOVA results
+summary(anova_result)
+#two stars! Results are significantly different
+
+#Which ones?
+#Run a Tukey HSD test
+
+# Conduct Tukey post hoc test
+#tukey_result <- TukeyHSD(anova_result)
+
+# Print the Tukey post hoc test results
+#print(tukey_result)
+
+#Interpretation (from ANOVA before I added word_count covariate)
+#Significant difference between Juventine and Jean (p = 0.002)
+#Marginally significant difference between Juventine and Flora (p = 0.075)
+#Everything else insignificant. 
+
+
+
+
+#Try a regression model too
+model_pos_id <- lm(score_diff ~ ivr_id + word_count, data = doc_scores_id)
+
+# Summarize the model
+summary(model_pos_id)
+
+
+#Interpretation (before adding word count covariate)
+#Juventine is significantly different from others.
+#Significantly lower than the other two in terms of level of positivity elicited. 
+
+
+#Question: Is she actually affecting the results, or just the respondents' demeanor?
+#Unclear at this point
+#Would need to read the interviews to be sure. 
+
+
+
+
+
+#Interpretation (with word count covariate):
+#Difference between interviewers is even more pronounced
+#Jeannine and John significantly different (more positive) than Flora
+#Juventine and Flora similar, but Juventine more positive. 
+
+
+
+#Good covariates to look at if I had the data:
+#Level of exposure to state narrative (proxied by proximity to capital?)
+#Employment status
+#Gender
+#Survivor, bystander, or perpetrator
+#Income
+
+
+
+########################################################################
+
+
+
+
+#   3. More sophisticated sentiment analysis
+# Rather than using Caren's dictionary, use my own
+# Look through a couple interviews and see which words
+# Are associated with optimistic and pro-government views
+# And which ones are associated with the opposite views
+# Report these results as well.
+# Validate these results again the qualitative slow read of the interviews.
+# Does the computer method work?
+# The truth is that most people are very positive. 
+
+#I don't think I'm going to do this, since the other one seemed to work
+#Unnecessary, but would be cool. 
+
+
+
+
+
+
+########################################################################
+
+
+#Old code (ignore)
+
+# # Install and load the 'proxy' package
+# install.packages("proxy")
+# library(proxy)
+# 
+# # Assuming 'dtm' is your document-term matrix
+# # Replace 'dtm' with the actual name of your document-term matrix
+# # Make sure your matrix is numeric, as cosine function expects numeric input
+# 
+# # Calculate cosine similarity between the first 74 rows and the last row
+# cosine_sim <- proxy::proxy(data.matrix(dtm[1:74, ]), data.matrix(dtm[75, ]), method = "cosine")
+# 
+# # Print or use the 'cosine_sim' matrix as needed
+# print(cosine_sim)
+
+
+
+# This will give you a matrix of cosine similarity values, where each element [i, j] represents the cosine similarity between document i (from the first 74 rows) and document 75 (the last row).
+# 
+# Make sure to replace 'dtm' with the actual name of your document-term matrix. If your matrix is not numeric, you may need to convert it using as.matrix() and then data.matrix().
+# 
+# Note: The proxy package provides a flexible framework for calculating various similarities, and the method parameter is set to "cosine" for cosine similarity in this example.
+
+
+
+
+```
+
+
+
+
+
+```{r}
+#Try lame version of cosine similarity
+#Without removing Interviewer lines
+
+#dataset we need is called "all_text", which was created near the beginning of the code. 
+#Create a document term matrix out of this.
+
+# library(jsonlite)
+# library(dplyr)
+# library(stringr)
+# library(stm)
+# library(SnowballC)
+# library(tm)
+# 
+# for (i in 1:nrow(all_text)) {
+#   body <- all_text$text[i]
+#   title <- all_text$doc_id[i] %>%
+#     str_replace_all(" ", "") %>%
+#     str_replace_all("'", "") %>%
+#     str_replace_all("/", "") %>%
+#     str_replace_all("\\?", "") %>%
+#     str_replace_all("|", "") %>%
+#     str_replace_all(";", "") #%>%
+#     #str_replace_all(".", "")
+# 
+#   sink(paste0("C:/Users/OSU/UCLA/UCLA Quarter IV/rwandaDTM/doc_", title, ".txt"))
+#   cat(body)
+#   sink()
+# }
+# 
+# 
+# 
+# #Gather documets into a corpus
+# corpus.all <- Corpus(DirSource("C:/Users/OSU/UCLA/UCLA Quarter IV/rwandaDTM"))
+# 
+# 
+# 
+# #The following code is adapted from Michelle Torres "06_TextAnalysis_I" file
+# ## make lower case
+# corpus.all_prep <- tm_map(corpus.all, content_transformer(tolower)) 
+# corpus.all_prep[[1]]$content
+# corpus.all_prep[[1]]$meta # metadata to edit
+# 
+# 
+# 
+# ## remove white space
+# corpus.all_prep <- tm_map(corpus.all_prep, stripWhitespace) # and \n!
+# corpus.all_prep[[1]]$content
+# 
+# ## remove punctuation 
+# corpus.all_prep <- tm_map(corpus.all_prep, removePunctuation)
+# corpus.all_prep[[1]]$content
+# 
+# ## remove numbers
+# corpus.all_prep <- tm_map(corpus.all_prep, removeNumbers) 
+# corpus.all_prep[[1]]$content
+# 
+# # let's check stop words in english
+# head(stopwords("english"), 20) # note the pronouns, can you think of cases where some of these
+# # might be useful to retain?
+# 
+# ## remove stop words 
+# corpus_dtm <- tm_map(corpus.all_prep, removeWords, stopwords("english")) # you can customize your list 
+# corpus_dtm[[1]]$content
+# 
+# ## finally stem remaining words
+# corpus_dtm <- tm_map(corpus_dtm, stemDocument) # Consider lemmatizing!
+# corpus_dtm[[1]]$content
+# 
+# 
+# 
+# 
+# ### Let's build our Document-Term Matrix
+# dtm_full <- DocumentTermMatrix(corpus_dtm)
+# dtm_full
+# dtm_full$nrow
+# dtm_full$ncol
+# dtm_full$i
+# 
+# 
+# #Reformat as matrix
+# #Then reformat as data frame
+# 
+# dtmx = as.matrix(dtm_full)
+# dtmf = as.data.frame(dtmx)
+# 
+# dim(dtmx)
+# 
+# 
+# #There's 1 row for each document
+# #There's 1 column for each term
+# #The number in each cell corresponds to the number of times that term appears in that document
+# 
+# 
+# 
+# 
+# # Install and load the 'proxy' package
+# #install.packages("proxy")
+# library(proxy)
+# 
+# 
+# # Calculate cosine similarity between the first 74 rows and the last row
+# cosine_sim <- proxy::dist(dtmx[1:75, , drop = FALSE], dtmx[75, , drop = FALSE], method = "cosine")
+# 
+# # Convert distance to similarity
+# cosine_sim2 <- 1 - cosine_sim
+# 
+# print(cosine_sim2)
+# class(cosine_sim2)
+# 
+# csim2 = as.vector(cosine_sim2)
+# 
+# #Without Kagame's score
+# csim3 = csim2[1:74]
+# print(csim3)
+# 
+# 
+# 
+# #Add this to data frame as column
+# dtmf_with_scores <- data.frame(SimilarityScore = csim2, dtmf)
+# 
+# dtmfs_arranged = dtmf_with_scores %>% arrange(desc(SimilarityScore))
+# dtmfs_interviews = dtmfs_arranged %>% subset(round(SimilarityScore, digits = 1) != 1)
+# 
+# #Plot distribution of pct_match for all interviews
+# hist(dtmfs_interviews$SimilarityScore, 
+#      main = "Distribution of Similarity Score: Overlap between Interviews and Speeches",
+#      xlab = "Cosine Similarity Score",
+#      ylab = "Frequency",
+#      col = "lightblue",
+#      border = "black")
+# 
+# 
+# 
+# 
+# #Look for outliers
+# #Use Z scores
+# 
+# 
+# zzzzzzz = scale(as.vector(dtmfs_interviews$SimilarityScore))
+# z_outs = which(abs(zzzzzzz) > 2)
+# print(z_outs)
+# #The top two are outliers (based on z>2 rule of thumb)
+# 
+# 
+# #Other way (same results)
+# z_scores <- scale(csim3)
+# 
+# # Identify outliers based on Z-score (threshold, e.g., 2)
+# outliers <- which(abs(z_scores) > 2)
+# print(outliers)
+# 
+# 
+# 
+# #Indices 4 and 6 are outliers
+# 
+# 
+# 
+# 
+# 
+# #Graphical way
+# boxplot(csim3, main = "Boxplot of Data")
+# 
+# # Identify potential outliers
+# outliers <- boxplot(csim3, plot = FALSE)$out
+# print(outliers)
+
+
+
+```
+
+
+
+
+
+
+
+```{r}
+#Analysis from beyond Michelle's class:
+
+
+#Copy all the respondents' text from all interviews to the Clipboard:
+writeClipboard(text_data$text_only_resp)
+#This is an inferior method, but I'm going to start by just pasting it all in one document
+#Ideally, I would recreate all 74 interview documents with all the interview text stripped off. 
+#But let's start with just one document for now.
+
+#Treat this document at the set of documents we will use to construct the corpus for stm. 
+
+#Gather documets into a corpus
+#Documents should be stored in a single folder, referenced by the filepath below:
+corpus.raw <- Corpus(DirSource("C:/Users/OSU/UCLA/UCLA Quarter V/Rwanda Interviews"))
+
+#Note: The variable name "corpus" is used above
+#This is dumb. 
+#I should rename it if I clean up the file. 
+#Otherwise it will overrite the variable when I run both code chunks. 
+
+
+#The following code is adapted from Michelle Torres "06_TextAnalysis_I" file
+## make lower case
+corpus.prep <- tm_map(corpus.raw, content_transformer(tolower)) 
+corpus.prep[[1]]$content
+corpus.prep[[1]]$meta # metadata to edit
+
+
+
+## remove white space
+corpus.prep <- tm_map(corpus.prep, stripWhitespace) # and \n!
+corpus.prep[[1]]$content
+
+## remove punctuation 
+corpus.prep <- tm_map(corpus.prep, removePunctuation)
+corpus.prep[[1]]$content
+
+## remove numbers
+corpus.prep <- tm_map(corpus.prep, removeNumbers) 
+corpus.prep[[1]]$content
+
+# let's check stop words in english
+head(stopwords("english"), 20) # note the pronouns, can you think of cases where some of these
+# might be useful to retain?
+
+## remove stop words 
+corpus <- tm_map(corpus.prep, removeWords, stopwords("english")) # you can customize your list 
+corpus[[1]]$content
+
+## finally stem remaining words
+corpus <- tm_map(corpus, stemDocument) # Consider lemmatizing!
+corpus[[1]]$content
+
+
+
+
+#Can you create a dtm with just one document?
+dtm_all <- DocumentTermMatrix(corpus)
+dtm_all
+dtm_all$nrow
+dtm_all$ncol
+dtm_all$i
+#Apparently yes - it just makes a matrix with one row (for the one document) and 4889 columns (one for each term?)
+
+dtm_all.mat <- as.matrix(dtm_all)
+head(dtm_all.mat[,1:10])
+
+
+
+
+
+
+
+#Select only the top 1000 words (arbitrary, but we did this in Problem Set 4 in 209):
+
+#Calculate column sums
+column_sums <- colSums(dtm_all.mat)
+
+#Identify the indices of the top 1000 columns
+top_columns_indices <- order(column_sums, decreasing = TRUE)[1:1000]
+
+#Subset matrix to keep only the top 1000 columns
+top1k <- dtm_all.mat[, top_columns_indices]
+
+dim(top1k)
+#Should be 1 x 1000
+#NULL
+
+#Hmm
+
+#Try reformatting as a matrix:
+top1k_mat <- as.matrix(top1k)
+
+#Transpose b/c it defaulted to column vector
+
+t1kt = t(top1k_mat)
+#It worked!
+
+
+
+
+
+
+
+install.packages("topicmodels")
+library(topicmodels)
+
+#Determine number of topics
+#Let's say 6 for now:
+# Set the number of topics
+num_topics <- 6
+
+# Create the LDA model
+lda_model <- LDA(t1kt, k = num_topics)
+
+
+# Extract topics
+topics <- topics(lda_model)
+
+# Print the top words associated with each topic
+top_terms <- terms(lda_model, 10)  # Change 10 to the number of words you want to display per topic
+top_terms
+
+
+#If I had multiple documents, I could do this: 
+# Get document-topic distributions
+#doc_topics <- posterior(lda_model)$topics
+
+# Assign each document to the most probable topic
+#doc_assigned_topics <- apply(doc_topics, 1, which.max)
+
+
+
+```
